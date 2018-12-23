@@ -58,6 +58,8 @@ def expl_hopkins(x, split_size=50, num_iters=10):
         min_dist_ran = find_min_distances(X_ran, X_tra)
         min_dist_spl = find_min_distances(X_spl, X_tra)
 
+        # print("random")
+        # print min_dist_ran
         ran_sum = min_dist_ran.sum()
         # print("sum %.3f" % (ran_sum))
 
