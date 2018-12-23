@@ -2,12 +2,19 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_samples, silhouette_score, calinski_harabaz_score
 import matplotlib.pyplot as plot
 import matplotlib.cm as cm
-import numpy as np
 from itertools import cycle
 from random import randint
 from sklearn.cluster import DBSCAN
 import pandas as pd
 import STRING
+from sklearn.neighbors import NearestNeighbors
+from random import sample
+from numpy.random import uniform
+import numpy as np
+from math import isnan
+from sklearn.preprocessing import LabelEncoder
+from sklearn.utils import safe_indexing, check_X_y
+from sklearn.metrics import pairwise_distances
 
 def find_min_distances(x1, x2):
     min_dist = np.zeros(len(x1))
@@ -69,42 +76,6 @@ def expl_hopkins(x, split_size=50, num_iters=10):
     print("average hopkins stat %.3f" % av_hopkins_stat)
 
 
-1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-25
-26
-27
-28
-29
-from sklearn.neighbors import NearestNeighbors
-from random import sample
-from numpy.random import uniform
-import numpy as np
-from math import isnan
-
-
 def hopkins(X):
     d = X.shape[1]
     # d = len(vars) # columns
@@ -126,10 +97,75 @@ def hopkins(X):
     H = sum(ujd) / (sum(ujd) + sum(wjd))
     if isnan(H):
         print(
-        ujd, wjd)
+            ujd, wjd)
         H = 0
 
     return H
+
+
+def check_number_of_labels(n_labels, n_samples):
+    """Check that number of labels are valid.
+    Parameters
+    ----------
+    n_labels : int
+        Number of labels
+    n_samples : int
+        Number of samples
+    """
+    if not 1 < n_labels < n_samples:
+        raise ValueError("Number of labels is %d. Valid values are 2 "
+                         "to n_samples - 1 (inclusive)" % n_labels)
+
+
+def davies_bouldin_score(X, labels):
+    """Computes the Davies-Bouldin score.
+    The score is defined as the ratio of within-cluster distances to
+    between-cluster distances.
+    Read more in the :ref:`User Guide <davies-bouldin_index>`.
+    Parameters
+    ----------
+    X : array-like, shape (``n_samples``, ``n_features``)
+        List of ``n_features``-dimensional data points. Each row corresponds
+        to a single data point.
+    labels : array-like, shape (``n_samples``,)
+        Predicted labels for each sample.
+    Returns
+    -------
+    score: float
+        The resulting Davies-Bouldin score.
+    References
+    ----------
+    .. [1] Davies, David L.; Bouldin, Donald W. (1979).
+       `"A Cluster Separation Measure"
+       <https://ieeexplore.ieee.org/document/4766909>`__.
+       IEEE Transactions on Pattern Analysis and Machine Intelligence.
+       PAMI-1 (2): 224-227
+    """
+    X, labels = check_X_y(X, labels)
+    le = LabelEncoder()
+    labels = le.fit_transform(labels)
+    n_samples, _ = X.shape
+    n_labels = len(le.classes_)
+    check_number_of_labels(n_labels, n_samples)
+
+    intra_dists = np.zeros(n_labels)
+    centroids = np.zeros((n_labels, len(X[0])), dtype=np.float)
+    for k in range(n_labels):
+        cluster_k = safe_indexing(X, labels == k)
+        centroid = cluster_k.mean(axis=0)
+        centroids[k] = centroid
+        intra_dists[k] = np.average(pairwise_distances(
+            cluster_k, [centroid]))
+
+    centroid_distances = pairwise_distances(centroids)
+
+    if np.allclose(intra_dists, 0) or np.allclose(centroid_distances, 0):
+        return 0.0
+
+    score = (intra_dists[:, None] + intra_dists) / centroid_distances
+    score[score == np.inf] = np.nan
+    return np.mean(np.nanmax(score, axis=1))
+
 
 def cluster_internal_validation(x, n_clusters, model=None):
     lscores = []
@@ -137,31 +173,36 @@ def cluster_internal_validation(x, n_clusters, model=None):
     for nc in range(2, n_clusters + 1):
         print(nc)
         if model is None:
-            km = KMeans(n_clusters=nc, random_state=10)
+            km = KMeans(n_clusters=nc, random_state=10, init='k-means++', n_init=100, max_iter=300)
         else:
             km = DBSCAN(eps=0.5, min_samples=10, leaf_size=30, n_jobs=-1)
 
         labels = km.fit_predict(x)
         lscores.append((
-            silhouette_score(x, labels),
-            calinski_harabaz_score(x, labels)
-        ))
+                        silhouette_score(x, labels),
+                        calinski_harabaz_score(x, labels),
+                        davies_bouldin_score(x, labels)
+
+                        ))
 
     print(lscores)
     fig = plot.figure(figsize=(15, 5))
-    fig.add_subplot(121)
-    plot.plot(range(2, n_clusters + 1), [x for x, _ in lscores])
+    fig.add_subplot(131)
+    plot.plot(range(2, n_clusters + 1), [x for x, _, _ in lscores])
     plot.title('Silhoutte Score')
     plot.xlabel('Number of Clusters')
-    fig.add_subplot(122)
-    plot.plot(range(2, n_clusters + 1), [x for _, x in lscores])
+    fig.add_subplot(132)
+    plot.plot(range(2, n_clusters + 1), [x for _, x, _ in lscores])
     plot.title('Calinski-Harabaz Score')
+    plot.xlabel('Number of Clusters')
+    fig.add_subplot(133)
+    plot.plot(range(2, n_clusters + 1), [x for _, _, x in lscores])
+    plot.title('Davies-Bouldin Index')
     plot.xlabel('Number of Clusters')
     plot.show()
 
 
 def silhouette_coef(x, range_n_clusters, model=None):
-
     for n_clusters in range_n_clusters:
 
         # Create a subplot wtih 1 row and 2 cols
@@ -239,7 +280,7 @@ def silhouette_coef(x, range_n_clusters, model=None):
         ax2.set_ylabel("Feature space for the 2nd feature")
 
         plot.suptitle(("Silhouette analysis for KMeans clustering on sample data "
-                      "with n_clusters = %d" % n_clusters),
+                       "with n_clusters = %d" % n_clusters),
                       fontsize=14, fontweight='bold')
 
         plot.show()

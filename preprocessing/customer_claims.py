@@ -180,4 +180,4 @@ customer_df['final_date'] = pd.Series(pd.to_datetime('2017-12-31', format='%Y-%m
 customer_df['policy_days'] = pd.Series((customer_df['final_date'] - customer_df['poliza_fecha_inicio']).dt.days,
                                        index=customer_df.index)
 
-customer_df.to_csv(STRING.path_db_extra + '\\historical_data.csv', index=False, sep=';', encoding='latin1')
+customer_df.to_csv(STRING.path_db_extra + '\\historical_data.csv', index=False, sep=';', encoding='utf-8')
