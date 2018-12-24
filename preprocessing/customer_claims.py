@@ -83,7 +83,7 @@ customer_df['cliente_edad'] = customer_df['cliente_edad'].map(int)
 customer_df = customer_df[customer_df['cliente_antiguedad'] != '?']
 customer_df['cliente_antiguedad'] = customer_df['cliente_antiguedad'].map(int)
 
-customer_df = customer_df.loc[customer_df[customer_df['cliente_edad'] - customer_df['cliente_antiguedad'] >= 17]]
+customer_df = customer_df[customer_df['cliente_edad'] - customer_df['cliente_antiguedad'] >= 17]
 
 # AGE RANGES
 customer_df['cliente_edad_18_30'] = np.where(customer_df['cliente_edad'] <= 30, 1, 0)
