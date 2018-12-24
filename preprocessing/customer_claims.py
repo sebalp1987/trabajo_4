@@ -79,6 +79,12 @@ statistics.mean_diff_test(customer_df[customer_df['cliente_edad'] != '?'],
 customer_df = customer_df[customer_df['cliente_edad'] != '?']
 customer_df['cliente_edad'] = customer_df['cliente_edad'].map(int)
 
+# CLIENTE ANTIGUEDAD
+customer_df = customer_df[customer_df['cliente_antiguedad'] != '?']
+customer_df['cliente_antiguedad'] = customer_df['cliente_antiguedad'].map(int)
+
+customer_df = customer_df.loc[customer_df[customer_df['cliente_edad'] - customer_df['cliente_antiguedad'] >= 17]]
+
 # AGE RANGES
 customer_df['cliente_edad_18_30'] = np.where(customer_df['cliente_edad'] <= 30, 1, 0)
 customer_df['cliente_edad_30_65'] = np.where(customer_df['cliente_edad'].between(31, 65), 1, 0)
@@ -180,6 +186,7 @@ customer_df['final_date'] = pd.Series(pd.to_datetime('2017-12-31', format='%Y-%m
 customer_df['policy_days'] = pd.Series((customer_df['final_date'] - customer_df['poliza_fecha_inicio']).dt.days,
                                        index=customer_df.index)
 
-customer_df.apply(pd.DataFrame.describe, axis=1).to_csv('summary_statistics.csv', sep=';', encoding='utf-8')
+newdf = customer_df.describe(include='all').transpose().to_csv(STRING.path_db_extra + '\\summary_statistics.csv',
+                                                               sep=';', encoding='utf-8')
 
 customer_df.to_csv(STRING.path_db_extra + '\\historical_data.csv', index=False, sep=';', encoding='utf-8')
