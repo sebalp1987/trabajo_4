@@ -16,6 +16,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import safe_indexing, check_X_y
 from sklearn.metrics import pairwise_distances
 
+
 def find_min_distances(x1, x2):
     min_dist = np.zeros(len(x1))
 
@@ -173,7 +174,7 @@ def cluster_internal_validation(x, n_clusters, model=None):
     for nc in range(2, n_clusters + 1):
         print(nc)
         if model is None:
-            km = KMeans(n_clusters=nc, random_state=10, init='k-means++', n_init=100, max_iter=300)
+            km = KMeans(n_clusters=nc, random_state=10, init='k-means++', n_init=100, max_iter=500)
         else:
             km = DBSCAN(eps=0.5, min_samples=10, leaf_size=30, n_jobs=-1)
 
@@ -309,7 +310,7 @@ def kmeans_plus_plus(x, k, n_init, max_iter, show_plot=True, drop='total_code', 
     df = pd.DataFrame(labels, columns=['labels'], index=x.index)
     df = pd.concat([x, df], axis=1)
     df = df.copy()
-    df.to_csv(STRING.path_db_aux + '\\' + file_name + '.csv', sep=';', index=True, encoding='latin1')
+    df.to_csv(STRING.path_db_extra + '\\' + file_name + '.csv', sep=';', index=True, encoding='latin1')
     labels_unique = np.unique(labels)
     n_clusters_ = len(labels_unique)
     if drop is not None:

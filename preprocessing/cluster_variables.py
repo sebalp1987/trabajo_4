@@ -58,10 +58,10 @@ print('VEHICLE CLUSTER')
 H = cluster_analysis.hopkins(x_object)
 print(H)
 cluster_analysis.expl_hopkins(x_object, num_iters=1000)
-cluster_analysis.cluster_internal_validation(x_object, n_clusters=20)
+cluster_analysis.cluster_internal_validation(x_object, n_clusters=50)
 cluster_analysis.silhouette_coef(x_object.values, range_n_clusters=range(10, 11, 1))
-cluster_analysis.kmeans_plus_plus(x_object, k=10, n_init=42, max_iter=500, drop=None, show_plot=False,
-                                  file_name='cluster_veh')
+# cluster_analysis.kmeans_plus_plus(x_object, k=10, n_init=42, max_iter=500, drop=None, show_plot=False,
+#                                  file_name='cluster_veh')
 
 # DROP DUPLICATES CUSTOMERS
 # customer_df = customer_df.sort_values(by=['cliente_poliza'], ascending=[False])
@@ -96,8 +96,8 @@ print('MEDIADOR CLUSTER')
 H = cluster_analysis.hopkins(x_mediador)
 print(H)
 cluster_analysis.expl_hopkins(x_mediador, num_iters=1000)
-cluster_analysis.cluster_internal_validation(x_mediador, n_clusters=20)
-cluster_analysis.silhouette_coef(x_mediador.values, range_n_clusters=range(10, 11, 1))
+cluster_analysis.cluster_internal_validation(x_mediador, n_clusters=50)
+# cluster_analysis.silhouette_coef(x_mediador.values, range_n_clusters=range(10, 11, 1))
 
 
 cluster_analysis.kmeans_plus_plus(x_mediador, k=10, n_init=42, max_iter=500, drop=None, show_plot=False,
@@ -122,7 +122,7 @@ cp_risk = cp_risk.groupby(['cliente_cp']).agg({
 })
 
 print(cp_risk)
-cp_risk = cp_risk[cp_risk[('cliente_cp', 'count')] > 5.0]
+cp_risk = cp_risk[cp_risk[('cliente_cp', 'count')] >= 10.0]
 del cp_risk[('cliente_cp', 'count')]
 
 cp_risk = cp_risk.reset_index(drop=False)
@@ -131,7 +131,7 @@ print('POSTAL CODE CLUSTER')
 H = cluster_analysis.hopkins(x_mediador)
 print(H)
 cluster_analysis.expl_hopkins(cp_risk.drop(['cliente_cp'], axis=1), num_iters=1000)
-cluster_analysis.cluster_internal_validation(cp_risk.drop(['cliente_cp'], axis=1), n_clusters=20)
+cluster_analysis.cluster_internal_validation(cp_risk.drop(['cliente_cp'], axis=1), n_clusters=50)
 # cluster_analysis.silhouette_coef(cp_risk.drop(['cliente_cp'], axis=1).values, range_n_clusters=range(10, 11, 1))
 
 cp_risk = cluster_analysis.kmeans_plus_plus(cp_risk, k=10, n_init=42, max_iter=500, drop='cliente_cp', show_plot=False,
@@ -194,8 +194,8 @@ print('CUSTOMER CLUSTER')
 H = cluster_analysis.hopkins(x_mediador)
 print(H)
 cluster_analysis.expl_hopkins(x_customer, num_iters=1000)
-cluster_analysis.cluster_internal_validation(x_customer, n_clusters=20)
-# cluster_analysis.silhouette_coef(x_customer.values, range_n_clusters=range(10, 11, 1))
+cluster_analysis.cluster_internal_validation(x_customer, n_clusters=50)
+cluster_analysis.silhouette_coef(x_customer.values, range_n_clusters=range(10, 11, 1))
 
 cluster_analysis.kmeans_plus_plus(x_customer, k=10, n_init=42, max_iter=500, drop=None, show_plot=False,
                                   file_name='clusters_customer')
