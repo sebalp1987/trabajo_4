@@ -9,12 +9,11 @@ pd.options.display.max_columns = 500
 # SOURCE FILE
 customer_df = pd.read_csv(STRING.file_claim, sep=',', encoding='utf-8', quotechar='"',
                           parse_dates=['poliza_fecha_inicio'])
-customer_df = customer_df[customer_df['poliza_fecha_inicio'] >= '2015-01-01']
+customer_df = customer_df[customer_df['cliente_fechaini_zurich'] >= '2013-01-01']
 
 # BAD ID
-'''
 customer_df = customer_df[customer_df['cliente_tipo_doc'].isin(['N', 'R', 'P'])]
-
+'''
 customer_df['bad_id'] = pd.Series(0, index=customer_df.index)
 print(len(customer_df.index))
 customer_df['bad_id'] = customer_df.apply(lambda y: id_conversor(y['cliente_tipo_doc'], y['cliente_nif']), axis=1)
@@ -22,6 +21,15 @@ customer_df = customer_df[customer_df['bad_id'] != 1]
 print(len(customer_df.index))
 del customer_df['bad_id']
 '''
+# CLIENTE ANTIGUEDAD
+customer_df['final_date'] = pd.Series(pd.to_datetime('2017-12-31', format='%Y-%m-%d', errors='coerce'),
+                                      index=customer_df.index)
+customer_df['cliente_fechaini_zurich'] = pd.to_datetime(customer_df['cliente_fechaini_zurich'], format='%Y-%m-%d', errors='coerce')
+customer_df = customer_df.dropna(subset=['cliente_fechaini_zurich'])
+customer_df['cliente_antiguedad_days'] = pd.Series((customer_df['final_date'] - customer_df['cliente_fechaini_zurich']).dt.days,
+                                       index=customer_df.index)
+
+customer_df['cliente_antiguedad'] = customer_df['cliente_antiguedad_days'] / 365
 
 # SEX VALIDATE
 # customer_df['cliente_sexo'] = customer_df['cliente_sexo'].replace('?', -1)
@@ -80,8 +88,7 @@ customer_df = customer_df[customer_df['cliente_edad'] != '?']
 customer_df['cliente_edad'] = customer_df['cliente_edad'].map(int)
 
 # CLIENTE ANTIGUEDAD
-customer_df = customer_df[customer_df['cliente_antiguedad'] != '?']
-customer_df['cliente_antiguedad'] = customer_df['cliente_antiguedad'].map(int)
+customer_df['cliente_antiguedad'] = customer_df['cliente_antiguedad'].map(float)
 
 customer_df = customer_df[customer_df['cliente_edad'] - customer_df['cliente_antiguedad'] >= 17]
 
@@ -180,13 +187,77 @@ dummy_region = pd.get_dummies(customer_df['REGION'], prefix='cliente_region', du
 customer_df = pd.concat([customer_df, dummy_region], axis=1)
 customer_df['cliente_extranjero'] = np.where(customer_df['cliente_nacionalidad'] != 'ESPAÑA', 1, 0)
 
-# POLICY DAYS
-customer_df['final_date'] = pd.Series(pd.to_datetime('2017-12-31', format='%Y-%m-%d', errors='coerce'),
-                                      index=customer_df.index)
-customer_df['policy_days'] = pd.Series((customer_df['final_date'] - customer_df['poliza_fecha_inicio']).dt.days,
-                                       index=customer_df.index)
+# VEHICULO VALOR
+threshold = customer_df['vehiculo_valor'].quantile(0.99)
+customer_df.loc[customer_df['vehiculo_valor'] > threshold, 'vehiculo_valor'] = threshold
+customer_df['vehiculo_valor'] = customer_df['vehiculo_valor'].round()
+customer_df['vehiculo_valor'] = customer_df['vehiculo_valor'].map(int)
+customer_df['vehiculo_valor_range'] = pd.cut(customer_df['vehiculo_valor'],
+                                             range(0, customer_df['vehiculo_valor'].max(), 1000), right=True)
+customer_df['vehiculo_valor_range'] = customer_df['vehiculo_valor_range'].fillna(
+    customer_df['vehiculo_valor_range'].max())
 
-newdf = customer_df.describe(include='all').transpose().to_csv(STRING.path_db_extra + '\\summary_statistics.csv',
-                                                               sep=';', encoding='utf-8')
+# CLIENTE EDAD
+customer_df['cliente_edad'] = customer_df['cliente_edad'].map(int)
+customer_df['cliente_edad_range'] = pd.cut(customer_df['cliente_edad'],
+                                           range(customer_df['cliente_edad'].min(), customer_df['cliente_edad'].max(),
+                                                 5), right=True)
+customer_df['cliente_edad_range'] = customer_df['cliente_edad_range'].fillna(customer_df['cliente_edad_range'].max())
+
+# VEHICULO USO
+customer_df['veh_uso'] = pd.Series('OTRO', index=customer_df.index)
+customer_df.loc[customer_df['d_uso_particular'] == 1, 'veh_uso'] = 'PARTICULAR'
+customer_df.loc[customer_df['d_uso_alquiler'] == 1, 'veh_uso'] = 'ALQUILER'
+
+# VEHICULO TIPO
+customer_df['veh_tipo'] = pd.Series('OTRO', index=customer_df.index)
+customer_df.loc[customer_df['d_tipo_ciclomotor'] == 1, 'veh_tipo'] = 'CICLOMOTOR'
+customer_df.loc[customer_df['d_tipo_furgoneta'] == 1, 'veh_tipo'] = 'FURGONETA'
+customer_df.loc[customer_df['d_tipo_camion'] == 1, 'veh_tipo'] = 'CAMION'
+customer_df.loc[customer_df['d_tipo_autocar'] == 1, 'veh_tipo'] = 'AUTOCAR'
+customer_df.loc[customer_df['d_tipo_remolque'] == 1, 'veh_tipo'] = 'REMOLQUE'
+customer_df.loc[customer_df['d_tipo_agricola'] == 1, 'veh_tipo'] = 'AGRICOLA'
+customer_df.loc[customer_df['d_tipo_industrial'] == 1, 'veh_tipo'] = 'INDUSTRIAL'
+customer_df.loc[customer_df['d_tipo_triciclo'] == 1, 'veh_tipo'] = 'TRICICLO'
+
+# CLEAN EDAD PERMISO
+customer_df = customer_df[customer_df['cliente_edad'] - customer_df['antiguedad_permiso'] >= 17]
+
+# CLEAN CP
+customer_df = customer_df[customer_df['cliente_cp'] != 0]
+
+# KEEP CUSTOMERS
+customer_df = customer_df.sort_values(by=['cliente_poliza'], ascending=[False])
+customer_df = customer_df.drop_duplicates(subset=['cliente_codfiliacion', 'vehiculo_modelo_desc'], keep='first')
+
+# CLEAN OUTLIERS
+for i in ['cliente_numero_polizas', 'cliente_numero_polizas_auto', 'cliente_numero_siniestros',
+          'cliente_numero_siniestros_auto']:
+    customer_df[i] = customer_df[i].map(int)
+customer_df = customer_df[customer_df['cliente_numero_polizas'] <= 20]
+customer_df = customer_df[customer_df['cliente_numero_polizas_auto'] <= customer_df['cliente_numero_polizas']]
+customer_df = customer_df[customer_df['cliente_numero_siniestros_auto'] <= customer_df['cliente_numero_siniestros']]
+customer_df = customer_df[customer_df['cliente_numero_siniestros'] <= customer_df['cliente_numero_polizas'] * 10]
+
+# Risk Variables
+outlier_var = ['cliente_numero_siniestros_auto_culpa',
+               'cliente_numero_siniestros',
+               'cliente_numero_siniestros_auto',
+               'cliente_carga_siniestral']
+
+for i in outlier_var:
+    customer_df[i] = customer_df[i] / ((customer_df['cliente_antiguedad_days'] + 1) / 365)
+
+# SHARE AUTO
+customer_df['cliente_numero_siniestros_auto_culpa_share'] = customer_df['cliente_numero_siniestros_auto_culpa'] * 100 / \
+                                                            customer_df[
+                                                                'cliente_numero_siniestros_auto']
+customer_df.loc[customer_df['cliente_numero_siniestros_auto'] == 0, 'cliente_numero_siniestros_auto_culpa_share'] = 0
+customer_df['cliente_numero_siniestros_auto_culpa_share'] = customer_df[
+    'cliente_numero_siniestros_auto_culpa_share'].round()
+
+customer_df.drop_duplicates(subset=['cliente_codfiliacion'], keep='first').describe(include='all').transpose().to_csv(
+    STRING.path_db_extra + '\\summary_statistics.csv',
+    sep=';', encoding='utf-8')
 
 customer_df.to_csv(STRING.path_db_extra + '\\historical_data.csv', index=False, sep=';', encoding='utf-8')
