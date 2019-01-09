@@ -6,4 +6,5 @@ LOCAL = os.path.dirname(os.path.abspath(__file__))
 path_db = LOCAL + '\\data_training'
 path_db_extra = LOCAL + '\\data_extra'
 file_claim = LOCAL + '\\data_extra\\clientesiniestro_od.csv'
+file_offer = LOCAL + '\\data_extra\\sincoofertas_od (3).csv'
 file_country = LOCAL + '\\data_extra\\country_list.csv'

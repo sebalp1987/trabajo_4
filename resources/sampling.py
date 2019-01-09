@@ -2,6 +2,7 @@ from imblearn.over_sampling import ADASYN, SMOTE
 from imblearn.under_sampling import AllKNN
 import pandas as pd
 
+
 def over_sampling(xTrain, yTrain, model='ADASYN', neighbors=200):
     """
     It generate synthetic sampling for the minority class using the model specificed. Always it has

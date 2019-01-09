@@ -4,56 +4,34 @@ from resources import cluster_analysis
 
 customer_df = pd.read_csv(STRING.path_db_extra + '\\historical_data.csv', sep=';', encoding='latin1')
 
+# SUBSET VARIABLES
 x = customer_df[
     ['cliente_codfiliacion', 'cliente_poliza', 'vehiculo_modelo_desc',
-     'cliente_numero_siniestros', 'cliente_carga_siniestral', 'cliente_numero_siniestros_auto',
-     'cliente_sexo', 'vehiculo_valor', 'cliente_edad_18_30', 'cliente_edad_30_65', 'cliente_edad_65',
-     'edad_segundo_conductor_riesgo', 'antiguedad_permiso', 'antiguedad_permiso_riesgo',
-     'antiguedad_permiso_segundo_riesgo',
-     'd_uso_particular', 'd_uso_alquiler', 'd_tipo_ciclomotor', 'd_tipo_furgoneta', 'd_tipo_camion', 'd_tipo_autocar',
-     'd_tipo_remolque', 'd_tipo_agricola',
-     'd_tipo_industrial', 'd_tipo_triciclo', 'antiguedad_vehiculo', 'cliente_extranjero', 'cliente_edad',
-     'vehiculo_categoria',
-     'vehiculo_heavy', 'mediador_riesgo', 'mediador_riesgo_auto', 'mediador_share_auto', 'REGION',
-     'cliente_numero_siniestros_auto_culpa', 'antiguedad_permiso_range', 'cliente_numero_polizas_auto'
-     ]]
+     'cliente_sexo', 'cliente_antiguedad', 'cliente_cp', 'cliente_carga_siniestral',
+     'cliente_numero_siniestros', 'cliente_numero_siniestros_auto', 'cliente_siniestro_rehusado',
+     'cliente_numero_siniestros_auto_culpa', 'cliente_numero_polizas', 'cliente_numero_polizas_auto',
+     'edad_segundo_conductor_riesgo', 'antiguedad_permiso_range', 'antiguedad_permiso_riesgo',
+     'antiguedad_permiso_segundo_riesgo', 'vehiculo_heavy', 'antiguedad_vehiculo',
+     'mediador_riesgo', 'mediador_riesgo_auto', 'mediador_share_auto', 'cliente_extranjero',
+     'vehiculo_valor_range', 'cliente_edad_range', 'cliente_numero_siniestros_auto_culpa_share',
+     'd_uso_particular', 'd_uso_alquiler', 'd_tipo_ciclomotor', 'd_tipo_camion', 'd_tipo_furgoneta',
+     'd_tipo_autocar', 'd_tipo_remolque', 'd_tipo_agricola', 'd_tipo_industrial', 'd_tipo_triciclo']]
 
 # x = x.sort_values(by=['cliente_poliza'], ascending=[False])
 # x = x.drop_duplicates(subset=['cliente_codfiliacion', 'vehiculo_modelo_desc'], keep='first')
 
 # RISK CLUSTERING BY OBJECT
-threshold = x['vehiculo_valor'].quantile(0.99)
-print(threshold)
-x.loc[x['vehiculo_valor'] > threshold, 'vehiculo_valor'] = threshold
-x['vehiculo_valor'] = x['vehiculo_valor'].round()
-x['vehiculo_valor'] = x['vehiculo_valor'].map(int)
-x['vehiculo_valor'] = pd.cut(x['vehiculo_valor'], range(0, x['vehiculo_valor'].max(), 1000), right=True)
-x['vehiculo_valor'] = x['vehiculo_valor'].fillna(x['vehiculo_valor'].max())
-
-x['veh_uso'] = pd.Series('OTRO', index=x.index)
-x.loc[x['d_uso_particular'] == 1, 'veh_uso'] = 'PARTICULAR'
-x.loc[x['d_uso_alquiler'] == 1, 'veh_uso'] = 'ALQUILER'
-
-x['veh_tipo'] = pd.Series('OTRO', index=x.index)
-x.loc[x['d_tipo_ciclomotor'] == 1, 'veh_tipo'] = 'CICLOMOTOR'
-x.loc[x['d_tipo_furgoneta'] == 1, 'veh_tipo'] = 'FURGONETA'
-x.loc[x['d_tipo_camion'] == 1, 'veh_tipo'] = 'CAMION'
-x.loc[x['d_tipo_autocar'] == 1, 'veh_tipo'] = 'AUTOCAR'
-x.loc[x['d_tipo_remolque'] == 1, 'veh_tipo'] = 'REMOLQUE'
-x.loc[x['d_tipo_agricola'] == 1, 'veh_tipo'] = 'AGRICOLA'
-x.loc[x['d_tipo_industrial'] == 1, 'veh_tipo'] = 'INDUSTRIAL'
-x.loc[x['d_tipo_triciclo'] == 1, 'veh_tipo'] = 'TRICICLO'
-
 x['counter'] = pd.Series(1, index=x.index)
 
 x_object = x.groupby(
-    ['vehiculo_valor', 'vehiculo_categoria',
+    ['vehiculo_valor_range', 'vehiculo_categoria',
      'veh_uso', 'veh_tipo', 'vehiculo_heavy', 'antiguedad_vehiculo']).agg(
     {
         'cliente_numero_siniestros_auto': ['mean'], 'cliente_numero_polizas_auto': ['mean'], 'counter': 'count'})
 
 x_object = x_object[x_object[('counter', 'count')] > 5.0]
 del x_object['counter']
+
 print('VEHICLE CLUSTER')
 H = cluster_analysis.hopkins(x_object)
 print(H)
@@ -80,7 +58,6 @@ columns_to_drop = ['cliente_fecha_nacimiento', 'cliente_nacionalidad', 'cliente_
                    ]
 
 customer_df = customer_df.drop(columns_to_drop, axis=1)
-customer_df = customer_df[customer_df['cliente_edad'] - customer_df['antiguedad_permiso'] >= 17]
 
 # RISK INTERMEDIARY
 x_mediador = customer_df[['mediador_cod_intermediario', 'mediador_riesgo_auto']]
@@ -104,13 +81,8 @@ cluster_analysis.kmeans_plus_plus(x_mediador, k=10, n_init=42, max_iter=500, dro
                                   file_name='cluster_intm')
 
 # RISK CLUSTERING BY CP
-cp_risk = customer_df[(customer_df['cliente_numero_siniestros'] < customer_df[
-    'cliente_numero_siniestros'].quantile(0.99))]
-print(len(customer_df.index))
-cp_risk = cp_risk[['cliente_cp',
+cp_risk = customer_df[['cliente_cp',
                    'cliente_numero_siniestros_auto', 'cliente_numero_polizas_auto']]
-
-cp_risk = cp_risk[cp_risk['cliente_cp'] != 0]
 
 cp_risk['cliente_cp'] = cp_risk['cliente_cp'].map(int)
 cp_risk = cp_risk.sort_values(by=['cliente_cp'], ascending=True)
@@ -142,19 +114,6 @@ cp_risk = cp_risk.rename(columns={('cliente_cp', ''): 'cliente_cp', 'labels': 'c
 customer_df['cliente_cp'] = customer_df['cliente_cp'].map(int)
 customer_df = pd.merge(customer_df, cp_risk, on='cliente_cp', how='inner')
 
-# RISK CLUSTERING BY CUSTOMER
-# First we normalize THE RISK VARIABLES by AGE IN THE COMPANY
-
-# Risk Variables
-target_variables = ['cliente_numero_siniestros_auto', 'cliente_numero_polizas_auto']
-
-for i in target_variables:
-    customer_df[i] = customer_df[i] / ((customer_df['policy_days'] + 1) / 365)
-    customer_df[i] = customer_df[i].round()
-
-customer_df = customer_df[(customer_df['cliente_numero_siniestros_auto'] < customer_df[
-    'cliente_numero_siniestros_auto'].quantile(0.99))]
-
 # Cluster at customer
 x = customer_df[
     ['cliente_codfiliacion', 'cliente_numero_siniestros', 'cliente_carga_siniestral', 'cliente_numero_siniestros_auto',
@@ -169,17 +128,9 @@ x = customer_df[
      'cliente_numero_siniestros_auto_culpa', 'antiguedad_permiso_range', 'cliente_numero_polizas_auto'
      ]]
 
-x['cliente_edad'] = x['cliente_edad'].map(int)
-x['cliente_edad'] = pd.cut(x['cliente_edad'], range(x['cliente_edad'].min(), x['cliente_edad'].max(), 5), right=True)
-x['cliente_edad'] = x['cliente_edad'].fillna(x['cliente_edad'].max())
-
-x['cliente_numero_siniestros_auto_culpa_share'] = x['cliente_numero_siniestros_auto_culpa'] * 100 / x[
-    'cliente_numero_siniestros_auto']
-x.loc[x['cliente_numero_siniestros_auto'] == 0, 'cliente_numero_siniestros_auto_culpa_share'] = 0
-x['cliente_numero_siniestros_auto_culpa_share'] = x['cliente_numero_siniestros_auto_culpa_share'].round()
 x['counter'] = pd.Series(1, index=x.index)
 x_customer = x.groupby(
-    ['cliente_edad', 'antiguedad_permiso_range', 'edad_segundo_conductor_riesgo', 'cliente_sexo',
+    ['cliente_edad_range', 'antiguedad_permiso_range', 'edad_segundo_conductor_riesgo', 'cliente_sexo',
      ]).agg(
     {
         'cliente_numero_siniestros_auto': ['mean'],

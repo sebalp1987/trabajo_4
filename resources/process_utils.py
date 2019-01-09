@@ -1,6 +1,7 @@
 import pandas as pd
 import STRING
 from sklearn.model_selection import train_test_split
+import datetime
 
 
 def output_normal_anormal_new(df: pd.DataFrame, output_file=True, key_var_split='target'):
@@ -76,3 +77,9 @@ def training_test_valid(df: pd.DataFrame, output_file=True, key_var_split='targe
         valid.to_csv(valid_file, sep=';', index=False)
 
     return train, valid, test
+
+
+def calculate_age(birthdate, sep=''):
+    birthdate = datetime.datetime.strptime(birthdate, '%Y' + sep + '%m' + sep + '%d')
+    today = datetime.date.today()
+    return today.year - birthdate.year - ((today.month, today.day) < (birthdate.month, birthdate.day))
