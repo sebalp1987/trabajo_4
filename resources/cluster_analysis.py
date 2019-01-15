@@ -70,7 +70,7 @@ def expl_hopkins(x, split_size=50, num_iters=10):
         # print("sum %.3f" % (spl_sum))
 
         hopkins_stat = spl_sum / (ran_sum + spl_sum)
-        print("hopkins stats %.3f" % hopkins_stat)
+        # print("hopkins stats %.3f" % hopkins_stat)
         hopkins_stats.append(hopkins_stat)
 
     av_hopkins_stat = np.mean(hopkins_stats)
@@ -100,8 +100,7 @@ def hopkins(X):
         print(
             ujd, wjd)
         H = 0
-
-    return H
+    print('HOPKINS INDEX ', H)
 
 
 def check_number_of_labels(n_labels, n_samples):
@@ -168,15 +167,12 @@ def davies_bouldin_score(X, labels):
     return np.mean(np.nanmax(score, axis=1))
 
 
-def cluster_internal_validation(x, n_clusters, model=None):
+def cluster_internal_validation(x, n_clusters):
     lscores = []
 
     for nc in range(2, n_clusters + 1):
-        print(nc)
-        if model is None:
-            km = KMeans(n_clusters=nc, random_state=10, init='k-means++', n_init=100, max_iter=500)
-        else:
-            km = DBSCAN(eps=0.5, min_samples=10, leaf_size=30, n_jobs=-1)
+
+        km = KMeans(n_clusters=nc, random_state=42, init='k-means++', n_init=100, max_iter=500)
 
         labels = km.fit_predict(x)
         lscores.append((
@@ -287,7 +283,7 @@ def silhouette_coef(x, range_n_clusters, model=None):
         plot.show()
 
 
-def kmeans_plus_plus(x, k, n_init, max_iter, show_plot=True, drop='total_code', file_name='clusters'):
+def kmeans_plus_plus(x, k, n_init, max_iter, show_plot=True, drop='total_code', file_name='clusters', reindex_label=''):
     """
     :param show_plot:
     :param drop:
@@ -299,18 +295,29 @@ def kmeans_plus_plus(x, k, n_init, max_iter, show_plot=True, drop='total_code', 
     :return:
     """
     if drop is not None:
-        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=n_init, max_iter=max_iter, random_state=0).fit(
+        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=n_init, max_iter=max_iter, random_state=42).fit(
             x.drop(drop, axis=1))
     else:
-        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=n_init, max_iter=max_iter, random_state=0).fit(
+        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=n_init, max_iter=max_iter, random_state=42).fit(
             x)
 
     labels = kmeans.labels_
     cluster_centers = kmeans.cluster_centers_
     df = pd.DataFrame(labels, columns=['labels'], index=x.index)
-    df = pd.concat([x, df], axis=1)
+    df = pd.concat([df, x], axis=1)
     df = df.copy()
-    df.to_csv(STRING.path_db_extra + '\\' + file_name + '.csv', sep=';', index=True, encoding='latin1')
+
+    if isinstance(reindex_label, (list,)):
+        df[reindex_label[0] + '_' + reindex_label[1]] = df[reindex_label[0]] / df[reindex_label[1]]
+        reindex_label = reindex_label[0] + '_' + reindex_label[1]
+
+    reindex_df = df.groupby(['labels'])[reindex_label].mean().sort_values(ascending=[True]).reset_index(
+        drop=False).reset_index(drop=False)
+    print(reindex_df)
+    df = pd.merge(df, reindex_df[['labels', 'index']], how='left', on='labels')
+    df = df.rename(columns={'index': file_name + '_risk'})
+    print(df)
+    df.to_csv(STRING.path_db_extra + '\\' + file_name + '.csv', sep=';', index=False, encoding='latin1')
     labels_unique = np.unique(labels)
     n_clusters_ = len(labels_unique)
     if drop is not None:

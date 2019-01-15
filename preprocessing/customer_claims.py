@@ -107,6 +107,9 @@ customer_df['edad_segundo_conductor'] = customer_df.apply(lambda y: calculate_ag
 customer_df['edad_segundo_conductor_riesgo'] = np.where(customer_df['edad_segundo_conductor'].between(18, 25), 1, 0)
 del customer_df['edad_segundo_conductor']
 
+customer_df['edad_conductor_riesgo'] = np.where(customer_df['cliente_edad'].between(18, 25), 1, 0)
+
+
 # LICENSE YEARS FIRST DRIVER
 customer_df['antiguedad_permiso'] = customer_df.apply(lambda y: calculate_age(y['vehiculo_fepecon_conductor1']), axis=1)
 customer_df['antiguedad_permiso_riesgo'] = np.where(customer_df['antiguedad_permiso'] <= 1, 1, 0)
@@ -167,14 +170,12 @@ customer_df['mediador_riesgo_auto'] = pd.Series(
 customer_df['mediador_share_auto'] = pd.Series(
     customer_df.mediador_numero_polizas_AUTO / customer_df.mediador_numero_polizas, index=customer_df.index)
 
-customer_df = customer_df.drop(['mediador_numero_siniestros', 'mediador_clase_intermediario', 'mediador_fecha_alta',
-                                'mediador_numero_polizas', 'mediador_numero_polizas_vigor',
-                                'mediador_numero_siniestros',
+customer_df = customer_df.drop(['mediador_clase_intermediario', 'mediador_fecha_alta',
+                                'mediador_numero_polizas_vigor',
                                 'mediador_numero_siniestros_fraude', 'mediador_numero_siniestros_pagados',
-                                'mediador_numero_polizas_AUTO',
-                                'mediador_numero_polizas_vigor_AUTO', 'mediador_numero_siniestros_AUTO',
+                                'mediador_numero_polizas_vigor_AUTO',
                                 'mediador_numero_siniestros_fraude_AUTO',
-                                'mediador_numero_siniestros_pagados_AUTO', 'mediador_fecha_alta'], axis=1)
+                                'mediador_numero_siniestros_pagados_AUTO'], axis=1)
 
 # ADDRESS
 customer_df['address_complete'] = customer_df['cliente_nombre_via'].map(str) + ' ' + customer_df[
@@ -224,7 +225,11 @@ customer_df.loc[customer_df['d_tipo_triciclo'] == 1, 'veh_tipo'] = 'TRICICLO'
 customer_df = customer_df[customer_df['cliente_edad'] - customer_df['antiguedad_permiso'] >= 17]
 
 # CLEAN CP
+customer_df['cliente_cp'] = customer_df['cliente_cp'].str.strip()
+customer_df = customer_df.dropna(subset=['cliente_cp'])
+customer_df['cliente_cp'] = customer_df['cliente_cp'].map(int)
 customer_df = customer_df[customer_df['cliente_cp'] != 0]
+
 
 # KEEP CUSTOMERS
 customer_df = customer_df.sort_values(by=['cliente_poliza'], ascending=[False])

@@ -2,151 +2,180 @@ import pandas as pd
 import STRING
 from resources import cluster_analysis
 
+pd.set_option('max_colwidth', 10)
+
 customer_df = pd.read_csv(STRING.path_db_extra + '\\historical_data.csv', sep=';', encoding='latin1')
 
 # SUBSET VARIABLES
-x = customer_df[
-    ['cliente_codfiliacion', 'cliente_poliza', 'vehiculo_modelo_desc',
-     'cliente_sexo', 'cliente_antiguedad', 'cliente_cp', 'cliente_carga_siniestral',
-     'cliente_numero_siniestros', 'cliente_numero_siniestros_auto', 'cliente_siniestro_rehusado',
-     'cliente_numero_siniestros_auto_culpa', 'cliente_numero_polizas', 'cliente_numero_polizas_auto',
-     'edad_segundo_conductor_riesgo', 'antiguedad_permiso_range', 'antiguedad_permiso_riesgo',
-     'antiguedad_permiso_segundo_riesgo', 'vehiculo_heavy', 'antiguedad_vehiculo',
-     'mediador_riesgo', 'mediador_riesgo_auto', 'mediador_share_auto', 'cliente_extranjero',
-     'vehiculo_valor_range', 'cliente_edad_range', 'cliente_numero_siniestros_auto_culpa_share',
-     'd_uso_particular', 'd_uso_alquiler', 'd_tipo_ciclomotor', 'd_tipo_camion', 'd_tipo_furgoneta',
-     'd_tipo_autocar', 'd_tipo_remolque', 'd_tipo_agricola', 'd_tipo_industrial', 'd_tipo_triciclo']]
+x = customer_df[[
+    'cliente_codfiliacion', 'cliente_poliza', 'cliente_sexo', 'cliente_edad', 'cliente_antiguedad', 'cliente_cp',
+    'cliente_numero_siniestros', 'cliente_numero_siniestros_auto', 'cliente_carga_siniestral', 'vehiculo_uso_codigo',
+    'vehiculo_valor', 'vehiculo_marca_codigo', 'vehiculo_modelo_codigo', 'vehiculo_categoria',
+    'mediador_cod_intermediario', 'cliente_siniestro_rehusado', 'cliente_numero_siniestros_auto_culpa',
+    'cliente_numero_polizas',
+    'cliente_numero_polizas_auto', 'cliente_antiguedad_days', 'cliente_edad_18_30', 'cliente_edad_30_65',
+    'cliente_edad_65', 'edad_segundo_conductor_riesgo', 'antiguedad_permiso', 'antiguedad_permiso_riesgo',
+    'antiguedad_permiso_range', 'antiguedad_permiso_segundo_riesgo', 'd_uso_particular', 'd_uso_alquiler',
+    'd_tipo_ciclomotor', 'd_tipo_furgoneta', 'd_tipo_camion', 'd_tipo_autocar', 'd_tipo_remolque', 'd_tipo_agricola',
+    'd_tipo_industrial', 'd_tipo_triciclo', 'vehiculo_heavy', 'antiguedad_vehiculo', 'mediador_riesgo',
+    'mediador_riesgo_auto', 'mediador_share_auto', 'cliente_region_AFRICAARABE', 'cliente_region_AFRICASUBSHARIANA',
+    'cliente_region_AMERICACENTRAL', 'cliente_region_AMERICADELNORTE', 'cliente_region_AMERICADELSUR',
+    'cliente_region_ASIACENTRAL', 'cliente_region_ASIAOCCIDENTAL', 'cliente_region_ASIAORIENTAL',
+    'cliente_region_EUROPACENTRAL', 'cliente_region_EUROPADELNORTE', 'cliente_region_EUROPADELSUR',
+    'cliente_region_EUROPAOCCIDENTAL', 'cliente_region_EUROPAORIENTAL', 'cliente_region_MARCARIBE',
+    'cliente_region_OCEANIA', 'cliente_region_nan', 'cliente_extranjero', 'vehiculo_valor_range', 'cliente_edad_range',
+    'cliente_numero_siniestros_auto_culpa_share',
+    'mediador_numero_siniestros', 'mediador_numero_polizas', 'mediador_numero_polizas_AUTO',
+    'mediador_numero_siniestros_AUTO']]
 
 # x = x.sort_values(by=['cliente_poliza'], ascending=[False])
 # x = x.drop_duplicates(subset=['cliente_codfiliacion', 'vehiculo_modelo_desc'], keep='first')
 
-# RISK CLUSTERING BY OBJECT
-x['counter'] = pd.Series(1, index=x.index)
+n_clusters_max = 10
+# H --> 1
+# SC --> 1
+# CH --> +inf
+# DB --> 0
 
-x_object = x.groupby(
-    ['vehiculo_valor_range', 'vehiculo_categoria',
-     'veh_uso', 'veh_tipo', 'vehiculo_heavy', 'antiguedad_vehiculo']).agg(
-    {
-        'cliente_numero_siniestros_auto': ['mean'], 'cliente_numero_polizas_auto': ['mean'], 'counter': 'count'})
-
-x_object = x_object[x_object[('counter', 'count')] > 5.0]
-del x_object['counter']
-
-print('VEHICLE CLUSTER')
-H = cluster_analysis.hopkins(x_object)
-print(H)
-cluster_analysis.expl_hopkins(x_object, num_iters=1000)
-cluster_analysis.cluster_internal_validation(x_object, n_clusters=50)
-cluster_analysis.silhouette_coef(x_object.values, range_n_clusters=range(10, 11, 1))
-# cluster_analysis.kmeans_plus_plus(x_object, k=10, n_init=42, max_iter=500, drop=None, show_plot=False,
-#                                  file_name='cluster_veh')
-
-# DROP DUPLICATES CUSTOMERS
-# customer_df = customer_df.sort_values(by=['cliente_poliza'], ascending=[False])
-# customer_df = customer_df.drop_duplicates(subset=['cliente_codfiliacion'], keep='first')
-print(len(customer_df.index))
-
-# DEL VARIABLE
-columns_to_drop = ['cliente_fecha_nacimiento', 'cliente_nacionalidad', 'cliente_pais_residencia',
-                   'cliente_fechaini_zurich', 'cliente_tipo_doc', 'vehiculo_uso_codigo', 'vehiculo_uso_desc',
-                   'vehiculo_clase_codigo', 'vehiculo_clase_descripcion', 'vehiculo_clase_agrupacion_descripcion',
-                   'vehiculo_potencia', 'vehiculo_marca_codigo', 'vehiculo_marca_desc',
-                   'vehiculo_modelo_codigo', 'vehiculo_modelo_desc', 'vehiculo_bonus_desc',
-                   'vehiculo_fenacco_conductor1',
-                   'cliente_nombre_via', 'cliente_numero_hogar', 'vehiculo_fenacco_conductor2',
-                   'vehiculo_tipo_combustible', 'COUNTRY', 'vehiculo_fepecon_conductor1'
-                   ]
-
-customer_df = customer_df.drop(columns_to_drop, axis=1)
-
-# RISK INTERMEDIARY
-x_mediador = customer_df[['mediador_cod_intermediario', 'mediador_riesgo_auto']]
-
-x_mediador = x_mediador.sort_values(by=['mediador_riesgo_auto'], ascending=[False])
-x_mediador = x_mediador.drop_duplicates(subset=['mediador_cod_intermediario'], keep='first')
-x_mediador = x_mediador.set_index('mediador_cod_intermediario')
-for i in x_mediador.columns.values.tolist():
-    x_mediador[i] = x_mediador[i] * 100 / x_mediador[i].max()
-    x_mediador[i] = x_mediador[i].round()
-
-print('MEDIADOR CLUSTER')
-H = cluster_analysis.hopkins(x_mediador)
-print(H)
-cluster_analysis.expl_hopkins(x_mediador, num_iters=1000)
-cluster_analysis.cluster_internal_validation(x_mediador, n_clusters=50)
-# cluster_analysis.silhouette_coef(x_mediador.values, range_n_clusters=range(10, 11, 1))
-
-
-cluster_analysis.kmeans_plus_plus(x_mediador, k=10, n_init=42, max_iter=500, drop=None, show_plot=False,
-                                  file_name='cluster_intm')
-
-# RISK CLUSTERING BY CP
+'''
+# RISK CLUSTERING BY CP #############################################################################################
 cp_risk = customer_df[['cliente_cp',
-                   'cliente_numero_siniestros_auto', 'cliente_numero_polizas_auto']]
+                       'cliente_numero_siniestros_auto', 'cliente_numero_polizas_auto']]
 
 cp_risk['cliente_cp'] = cp_risk['cliente_cp'].map(int)
 cp_risk = cp_risk.sort_values(by=['cliente_cp'], ascending=True)
 
 cp_risk = cp_risk.groupby(['cliente_cp']).agg({
-    'cliente_numero_siniestros_auto': ['mean'],
-    'cliente_numero_polizas_auto': ['mean'],
+    'cliente_numero_siniestros_auto': ['sum'],
+    'cliente_numero_polizas_auto': ['sum'],
     'cliente_cp': 'count'
 })
 
-print(cp_risk)
-cp_risk = cp_risk[cp_risk[('cliente_cp', 'count')] >= 10.0]
-del cp_risk[('cliente_cp', 'count')]
+cp_risk.columns = cp_risk.columns.droplevel(1)
+cp_risk = cp_risk[cp_risk['cliente_cp'] >= 10.0]
+del cp_risk['cliente_cp']
 
+cp_risk['siniestros_polizas'] = cp_risk['cliente_numero_siniestros_auto'] / cp_risk['cliente_numero_polizas_auto']
+cp_risk['siniestros_polizas'] = cp_risk['siniestros_polizas']*100
+cp_risk = cp_risk[['siniestros_polizas']]
 cp_risk = cp_risk.reset_index(drop=False)
 
 print('POSTAL CODE CLUSTER')
-H = cluster_analysis.hopkins(x_mediador)
-print(H)
-cluster_analysis.expl_hopkins(cp_risk.drop(['cliente_cp'], axis=1), num_iters=1000)
-cluster_analysis.cluster_internal_validation(cp_risk.drop(['cliente_cp'], axis=1), n_clusters=50)
-# cluster_analysis.silhouette_coef(cp_risk.drop(['cliente_cp'], axis=1).values, range_n_clusters=range(10, 11, 1))
+cluster_analysis.hopkins(cp_risk.drop(['cliente_cp'], axis=1))
+cluster_analysis.cluster_internal_validation(cp_risk.drop(['cliente_cp'], axis=1), n_clusters=n_clusters_max)
+cluster_analysis.kmeans_plus_plus(cp_risk, k=4, n_init=100, max_iter=500, drop='cliente_cp',
+                                            show_plot=False,
+                                            file_name='clusters_cp', reindex_label='siniestros_polizas')
 
-cp_risk = cluster_analysis.kmeans_plus_plus(cp_risk, k=10, n_init=42, max_iter=500, drop='cliente_cp', show_plot=False,
-                                            file_name='clusters_cp')
 
-cp_risk = cp_risk[[('cliente_cp', ''), 'labels']]
-cp_risk = cp_risk.rename(columns={('cliente_cp', ''): 'cliente_cp', 'labels': 'cp_risk'})
-customer_df['cliente_cp'] = customer_df['cliente_cp'].map(int)
-customer_df = pd.merge(customer_df, cp_risk, on='cliente_cp', how='inner')
+# RISK CLUSTERING BY INTERMEDIARY #####################################################################################
+x_mediador = customer_df[
+    ['mediador_cod_intermediario', 'mediador_riesgo_auto', 'mediador_share_auto', 'mediador_numero_siniestros',
+     'mediador_numero_polizas', 'mediador_numero_polizas_AUTO',
+     'mediador_numero_siniestros_AUTO']]
+
+x_mediador = x_mediador.sort_values(by=['mediador_riesgo_auto'], ascending=[False])
+x_mediador = x_mediador.drop_duplicates(subset=['mediador_cod_intermediario'], keep='first')
+x_mediador = x_mediador[['mediador_cod_intermediario', 'mediador_numero_polizas_AUTO',
+                         'mediador_numero_siniestros_AUTO']]
+x_mediador = x_mediador[x_mediador['mediador_numero_polizas_AUTO'] >= 10]
+
+print('MEDIADOR CLUSTER')
+cluster_analysis.hopkins(x_mediador.drop(['mediador_cod_intermediario'], axis=1))
+cluster_analysis.cluster_internal_validation(x_mediador.drop(['mediador_cod_intermediario'], axis=1), n_clusters=n_clusters_max)
+cluster_analysis.kmeans_plus_plus(x_mediador, k=7, n_init=100, max_iter=500, drop='mediador_cod_intermediario', show_plot=False,
+                                  file_name='cluster_intm', reindex_label=['mediador_numero_siniestros_AUTO','mediador_numero_polizas_AUTO'
+                         ])
+
+'''
+
+# AGREGAR MAS VARIABLES PARA EL OBJETIVO DEL CLUSTER!!!!!!!!!!!!!!!!!!!
+
+
+# RISK CLUSTERING BY OBJECT ###########################################################################################
+x_object = customer_df[
+    ['cliente_codfiliacion', 'cliente_poliza',
+     'cliente_numero_siniestros_auto', 'cliente_carga_siniestral', 'vehiculo_uso_codigo',
+     'vehiculo_valor', 'vehiculo_marca_codigo', 'vehiculo_modelo_codigo', 'vehiculo_categoria', 'vehiculo_modelo_desc',
+     'd_uso_particular', 'd_uso_alquiler',
+     'd_tipo_ciclomotor', 'd_tipo_furgoneta', 'd_tipo_camion', 'd_tipo_autocar', 'd_tipo_remolque', 'd_tipo_agricola',
+     'd_tipo_industrial', 'd_tipo_triciclo', 'vehiculo_heavy', 'antiguedad_vehiculo', 'vehiculo_valor_range',
+     'vehiculo_marca_desc', 'veh_uso', 'veh_tipo']]
+
+# We keep the last policy of the customer with the vehicle
+x_object = x_object.sort_values(by=['cliente_poliza'], ascending=[False])
+x_object = x_object.drop_duplicates(subset=['cliente_codfiliacion', 'vehiculo_modelo_desc'], keep='first')
+x_object['counter'] = pd.Series(1, index=x_object.index)
+
+x_object = x_object.groupby(
+    ['vehiculo_valor_range', 'vehiculo_categoria', 'vehiculo_marca_desc',
+     'veh_uso', 'veh_tipo', 'vehiculo_heavy', 'antiguedad_vehiculo']).agg(
+    {
+        'cliente_numero_siniestros_auto': ['mean'], 'cliente_carga_siniestral': ['mean'], 'counter': 'count'})
+
+x_object.columns = x_object.columns.droplevel(1)
+x_object = x_object[x_object['counter'] > 5.0]
+del x_object['counter']
+x_object = x_object.reset_index(drop=False)
+print(x_object.columns.values.tolist())
+print('VEHICLE CLUSTER')
+cluster_analysis.hopkins(x_object.drop(['vehiculo_valor_range', 'vehiculo_categoria', 'vehiculo_marca_desc',
+     'veh_uso', 'veh_tipo', 'vehiculo_heavy', 'antiguedad_vehiculo'], axis=1))
+cluster_analysis.cluster_internal_validation(x_object.drop(['vehiculo_valor_range', 'vehiculo_categoria', 'vehiculo_marca_desc',
+     'veh_uso', 'veh_tipo', 'vehiculo_heavy', 'antiguedad_vehiculo'], axis=1), n_clusters=n_clusters_max)
+cluster_analysis.kmeans_plus_plus(x_object, k=7, n_init=100, max_iter=500, drop=['vehiculo_valor_range', 'vehiculo_categoria', 'vehiculo_marca_desc',
+     'veh_uso', 'veh_tipo', 'vehiculo_heavy', 'antiguedad_vehiculo'], show_plot=False,
+                                  file_name='cluster_obj', reindex_label='cliente_numero_siniestros_auto')
+
+
+# RISK CLUSTERING BY CUSTOMER ##########################################################################################
 
 # Cluster at customer
-x = customer_df[
-    ['cliente_codfiliacion', 'cliente_numero_siniestros', 'cliente_carga_siniestral', 'cliente_numero_siniestros_auto',
-     'cliente_sexo', 'cp_risk', 'vehiculo_valor', 'cliente_edad_18_30', 'cliente_edad_30_65', 'cliente_edad_65',
-     'edad_segundo_conductor_riesgo', 'antiguedad_permiso', 'antiguedad_permiso_riesgo',
-     'antiguedad_permiso_segundo_riesgo',
-     'd_uso_particular', 'd_uso_alquiler', 'd_tipo_ciclomotor', 'd_tipo_furgoneta', 'd_tipo_camion', 'd_tipo_autocar',
-     'd_tipo_remolque', 'd_tipo_agricola',
-     'd_tipo_industrial', 'd_tipo_triciclo', 'antiguedad_vehiculo', 'cliente_extranjero', 'cliente_edad',
-     'vehiculo_categoria',
-     'vehiculo_heavy', 'mediador_riesgo', 'mediador_riesgo_auto', 'mediador_share_auto', 'REGION',
-     'cliente_numero_siniestros_auto_culpa', 'antiguedad_permiso_range', 'cliente_numero_polizas_auto'
+x_customer = customer_df[
+    ['cliente_codfiliacion', 'cliente_poliza', 'cliente_sexo', 'cliente_edad', 'cliente_antiguedad',
+     'cliente_numero_siniestros_auto', 'cliente_carga_siniestral',
+     'cliente_numero_polizas_auto', 'cliente_antiguedad_days', 'cliente_edad_18_30', 'cliente_edad_30_65',
+     'cliente_edad_65', 'edad_segundo_conductor_riesgo', 'antiguedad_permiso', 'antiguedad_permiso_riesgo',
+     'antiguedad_permiso_range', 'antiguedad_permiso_segundo_riesgo', 'cliente_region_AFRICAARABE', 'edad_conductor_riesgo',
+     'cliente_region_AFRICASUBSHARIANA',
+     'cliente_region_AMERICACENTRAL', 'cliente_region_AMERICADELNORTE', 'cliente_region_AMERICADELSUR',
+     'cliente_region_ASIACENTRAL', 'cliente_region_ASIAOCCIDENTAL', 'cliente_region_ASIAORIENTAL',
+     'cliente_region_EUROPACENTRAL', 'cliente_region_EUROPADELNORTE', 'cliente_region_EUROPADELSUR',
+     'cliente_region_EUROPAOCCIDENTAL', 'cliente_region_EUROPAORIENTAL', 'cliente_region_MARCARIBE',
+     'cliente_region_OCEANIA', 'cliente_region_nan', 'cliente_extranjero', 'cliente_edad_range',
+     'cliente_numero_siniestros_auto_culpa_share', 'vehiculo_modelo_desc'
      ]]
 
-x['counter'] = pd.Series(1, index=x.index)
-x_customer = x.groupby(
-    ['cliente_edad_range', 'antiguedad_permiso_range', 'edad_segundo_conductor_riesgo', 'cliente_sexo',
+# First we sum the customer policies
+x_customer = x_customer.sort_values(by=['cliente_poliza'], ascending=[False])
+x_customer = x_customer.drop_duplicates(subset=['cliente_codfiliacion', 'vehiculo_modelo_desc'], keep='first')
+
+x_customer['counter'] = pd.Series(1, index=x_customer.index)
+x_customer = x_customer.groupby(
+    ['cliente_edad_range', 'antiguedad_permiso_range', 'antiguedad_permiso_riesgo', 'edad_segundo_conductor_riesgo', 'cliente_sexo',
+     'antiguedad_permiso_segundo_riesgo',
+     'cliente_extranjero', 'edad_conductor_riesgo'
      ]).agg(
     {
         'cliente_numero_siniestros_auto': ['mean'],
-        'cliente_numero_polizas_auto': ['mean'],
         'counter': ['count']
     })
-
-x_customer = x_customer[x_customer[('counter', 'count')] > 5]
+x_customer.columns = x_customer.columns.droplevel(1)
+x_customer = x_customer[x_customer['counter'] > 5]
 del x_customer['counter']
+x_customer = x_customer.reset_index(drop=False)
 
 print('CUSTOMER CLUSTER')
-H = cluster_analysis.hopkins(x_mediador)
-print(H)
-cluster_analysis.expl_hopkins(x_customer, num_iters=1000)
-cluster_analysis.cluster_internal_validation(x_customer, n_clusters=50)
-cluster_analysis.silhouette_coef(x_customer.values, range_n_clusters=range(10, 11, 1))
-
-cluster_analysis.kmeans_plus_plus(x_customer, k=10, n_init=42, max_iter=500, drop=None, show_plot=False,
-                                  file_name='clusters_customer')
+cluster_analysis.hopkins(x_customer.drop(['cliente_edad_range', 'antiguedad_permiso_range', 'antiguedad_permiso_riesgo', 'edad_segundo_conductor_riesgo', 'cliente_sexo',
+     'antiguedad_permiso_segundo_riesgo',
+     'cliente_extranjero', 'edad_conductor_riesgo'
+     ], axis=1))
+cluster_analysis.cluster_internal_validation(x_customer.drop(['cliente_edad_range', 'antiguedad_permiso_range', 'antiguedad_permiso_riesgo', 'edad_segundo_conductor_riesgo', 'cliente_sexo',
+     'antiguedad_permiso_segundo_riesgo',
+     'cliente_extranjero'
+     ], axis=1), n_clusters=n_clusters_max)
+cluster_analysis.kmeans_plus_plus(x_customer, k=6, n_init=100, max_iter=500, drop=['cliente_edad_range', 'antiguedad_permiso_range', 'antiguedad_permiso_riesgo', 'edad_segundo_conductor_riesgo', 'cliente_sexo',
+     'antiguedad_permiso_segundo_riesgo',
+     'cliente_extranjero', 'edad_conductor_riesgo'
+     ], show_plot=False,
+                                  file_name='cluster_customer', reindex_label='cliente_numero_siniestros_auto')
