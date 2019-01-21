@@ -15,7 +15,8 @@ from math import isnan
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import safe_indexing, check_X_y
 from sklearn.metrics import pairwise_distances
-
+import seaborn as sns
+sns.set()
 
 def find_min_distances(x1, x2):
     min_dist = np.zeros(len(x1))
@@ -172,7 +173,7 @@ def cluster_internal_validation(x, n_clusters):
 
     for nc in range(2, n_clusters + 1):
 
-        km = KMeans(n_clusters=nc, random_state=42, init='k-means++', n_init=100, max_iter=500)
+        km = KMeans(n_clusters=nc, random_state=0, init='k-means++', n_init=1, max_iter=1000)
 
         labels = km.fit_predict(x)
         lscores.append((
@@ -295,10 +296,10 @@ def kmeans_plus_plus(x, k, n_init, max_iter, show_plot=True, drop='total_code', 
     :return:
     """
     if drop is not None:
-        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=n_init, max_iter=max_iter, random_state=42).fit(
+        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=n_init, max_iter=max_iter, random_state=0).fit(
             x.drop(drop, axis=1))
     else:
-        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=n_init, max_iter=max_iter, random_state=42).fit(
+        kmeans = KMeans(init='k-means++', n_clusters=k, n_init=n_init, max_iter=max_iter, random_state=0).fit(
             x)
 
     labels = kmeans.labels_
@@ -313,18 +314,21 @@ def kmeans_plus_plus(x, k, n_init, max_iter, show_plot=True, drop='total_code', 
 
     reindex_df = df.groupby(['labels'])[reindex_label].mean().sort_values(ascending=[True]).reset_index(
         drop=False).reset_index(drop=False)
-    print(reindex_df)
+
     df = pd.merge(df, reindex_df[['labels', 'index']], how='left', on='labels')
     df = df.rename(columns={'index': file_name + '_risk'})
-    print(df)
+
     df.to_csv(STRING.path_db_extra + '\\' + file_name + '.csv', sep=';', index=False, encoding='latin1')
     labels_unique = np.unique(labels)
     n_clusters_ = len(labels_unique)
     if drop is not None:
-        x = x.drop(drop, axis=1).values
-    else:
-        x = x.values
+        x = x.drop(drop, axis=1)
+
     if show_plot:
+        x_col = x.columns.values.tolist()
+        config_names = STRING.configure_names
+        x_col = [config_names.get(item, item) for item in x_col]
+        x = x.values
         plot.figure(1)
         plot.clf()
 
@@ -333,9 +337,13 @@ def kmeans_plus_plus(x, k, n_init, max_iter, show_plot=True, drop='total_code', 
             my_members = labels == k
             cluster_center = cluster_centers[k]
             plot.plot(x[my_members, 0], x[my_members, 1], col + '.')
+            plot.xlabel(x_col[0])
+            plot.ylabel(x_col[1])
             plot.plot(cluster_center[0], cluster_center[1], 'o', markerfacecolor=col,
                       markeredgecolor='k', markersize=14)
-        plot.title('Estimated number of clusters: %d' % n_clusters_)
+
+        plot.title(
+            file_name.replace('clusters_', '').upper() + ' risk estimated number of clusters: ' + '%d' % n_clusters_)
         plot.show()
 
     return df

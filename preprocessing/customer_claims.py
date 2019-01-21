@@ -24,10 +24,12 @@ del customer_df['bad_id']
 # CLIENTE ANTIGUEDAD
 customer_df['final_date'] = pd.Series(pd.to_datetime('2017-12-31', format='%Y-%m-%d', errors='coerce'),
                                       index=customer_df.index)
-customer_df['cliente_fechaini_zurich'] = pd.to_datetime(customer_df['cliente_fechaini_zurich'], format='%Y-%m-%d', errors='coerce')
+customer_df['cliente_fechaini_zurich'] = pd.to_datetime(customer_df['cliente_fechaini_zurich'], format='%Y-%m-%d',
+                                                        errors='coerce')
 customer_df = customer_df.dropna(subset=['cliente_fechaini_zurich'])
-customer_df['cliente_antiguedad_days'] = pd.Series((customer_df['final_date'] - customer_df['cliente_fechaini_zurich']).dt.days,
-                                       index=customer_df.index)
+customer_df['cliente_antiguedad_days'] = pd.Series(
+    (customer_df['final_date'] - customer_df['cliente_fechaini_zurich']).dt.days,
+    index=customer_df.index)
 
 customer_df['cliente_antiguedad'] = customer_df['cliente_antiguedad_days'] / 365
 
@@ -104,11 +106,10 @@ customer_df.loc[
 
 customer_df['edad_segundo_conductor'] = customer_df.apply(lambda y: calculate_age(y['vehiculo_fenacco_conductor2']),
                                                           axis=1)
-customer_df['edad_segundo_conductor_riesgo'] = np.where(customer_df['edad_segundo_conductor'].between(18, 25), 1, 0)
+customer_df['edad_segundo_conductor_riesgo'] = np.where(customer_df['edad_segundo_conductor'].between(18, 21), 1, 0)
 del customer_df['edad_segundo_conductor']
 
-customer_df['edad_conductor_riesgo'] = np.where(customer_df['cliente_edad'].between(18, 25), 1, 0)
-
+customer_df['edad_conductor_riesgo'] = np.where(customer_df['cliente_edad'].between(18, 21), 1, 0)
 
 # LICENSE YEARS FIRST DRIVER
 customer_df['antiguedad_permiso'] = customer_df.apply(lambda y: calculate_age(y['vehiculo_fepecon_conductor1']), axis=1)
@@ -131,13 +132,17 @@ customer_df = customer_df.drop(['vehiculo_fepecon_conductor2', 'antiguedad_permi
 # VEHICULE USE CODE
 customer_df['d_uso_particular'] = np.where(customer_df['vehiculo_uso_desc'].str.contains('PARTICULAR'), 1, 0)
 customer_df['d_uso_alquiler'] = np.where(customer_df['vehiculo_uso_desc'].str.contains('ALQUILER'), 1, 0)
+customer_df['d_uso_publico'] = np.where(customer_df['vehiculo_uso_desc'].str.contains('PUBLICO'), 1, 0)
 
 # VEHICLE TYPE
-tipo_dict = {'ciclomotor': 'PARTICULAR', 'furgoneta': 'FURGONETA', 'camion': 'CAMION', 'autocar': 'AUTOCAR',
-             'remolque': 'REMOLQUE', 'agricola': 'AGRICO', 'industrial': 'INDUSTRIAL', 'triciclo': 'TRICICLO'}
+tipo_dict = {'TURISMO PARTICULAR': 'car', 'CICLOMOTOR':'motorbike', 'FURGONETA': 'van-track',  'CAMION': 'van-track', 'AUTOCAR': 'autocar',
+             'REMOLQUE': 'van-track',  'AGRICO':'agricola',  'INDUSTRIAL': 'industrial',  'TRICICLO': 'motorbike'}
 
 for k, v in tipo_dict.items():
-    customer_df['d_tipo_' + k] = np.where(customer_df['vehiculo_uso_desc'].str.contains(v), 1, 0)
+    customer_df['d_tipo_' + v] = pd.Series(0, index=customer_df.index)
+for k, v in tipo_dict.items():
+    customer_df.loc[customer_df['vehiculo_uso_desc'].str.contains(k), 'd_tipo_' + v] = 1
+
 del tipo_dict
 
 # VEHICLE HEAVY
@@ -163,6 +168,23 @@ customer_df['antiguedad_vehiculo'] = pd.Series(2018 - customer_df['vehiculo_fech
 del customer_df['vehiculo_fecha_mat']
 
 # INTERMEDIARY STATISTICS
+# We readjust by the number of days
+customer_df['mediador_fecha_alta'] = pd.to_datetime(customer_df['mediador_fecha_alta'], format='%Y-%m-%d',
+                                                    errors='coerce')
+customer_df['mediador_antiguedad_days'] = pd.Series(
+    (customer_df['final_date'] - customer_df['mediador_fecha_alta']).dt.days,
+    index=customer_df.index)
+customer_df['mediador_numero_siniestros'] = customer_df['mediador_numero_siniestros'] / ((
+        customer_df['mediador_antiguedad_days'] + 1) / 365)
+
+customer_df['mediador_numero_polizas'] = customer_df['mediador_numero_polizas'] / ((
+        customer_df['mediador_antiguedad_days'] + 1) / 365)
+customer_df['mediador_numero_siniestros_AUTO'] = customer_df['mediador_numero_siniestros_AUTO'] / ((
+        customer_df['mediador_antiguedad_days'] + 1) / 365)
+
+customer_df['mediador_numero_polizas_AUTO'] = customer_df['mediador_numero_polizas_AUTO'] / ((
+        customer_df['mediador_antiguedad_days'] + 1) / 365)
+# We calculate the risk
 customer_df['mediador_riesgo'] = pd.Series(customer_df.mediador_numero_siniestros / customer_df.mediador_numero_polizas,
                                            index=customer_df.index)
 customer_df['mediador_riesgo_auto'] = pd.Series(
@@ -206,20 +228,21 @@ customer_df['cliente_edad_range'] = pd.cut(customer_df['cliente_edad'],
 customer_df['cliente_edad_range'] = customer_df['cliente_edad_range'].fillna(customer_df['cliente_edad_range'].max())
 
 # VEHICULO USO
-customer_df['veh_uso'] = pd.Series('OTRO', index=customer_df.index)
+customer_df['veh_uso'] = pd.Series('OTHER', index=customer_df.index)
 customer_df.loc[customer_df['d_uso_particular'] == 1, 'veh_uso'] = 'PARTICULAR'
-customer_df.loc[customer_df['d_uso_alquiler'] == 1, 'veh_uso'] = 'ALQUILER'
+customer_df.loc[customer_df['d_uso_alquiler'] == 1, 'veh_uso'] = 'RENTAL'
+customer_df.loc[customer_df['d_uso_publico'] == 1, 'veh_uso'] = 'PUBLIC'
+
 
 # VEHICULO TIPO
-customer_df['veh_tipo'] = pd.Series('OTRO', index=customer_df.index)
-customer_df.loc[customer_df['d_tipo_ciclomotor'] == 1, 'veh_tipo'] = 'CICLOMOTOR'
-customer_df.loc[customer_df['d_tipo_furgoneta'] == 1, 'veh_tipo'] = 'FURGONETA'
-customer_df.loc[customer_df['d_tipo_camion'] == 1, 'veh_tipo'] = 'CAMION'
+
+customer_df['veh_tipo'] = pd.Series('OTHER', index=customer_df.index)
+customer_df.loc[customer_df['d_tipo_car'] == 1, 'veh_tipo'] = 'CAR'
+customer_df.loc[customer_df['d_tipo_motorbike'] == 1, 'veh_tipo'] = 'MOTORBIKE'
+customer_df.loc[customer_df['d_tipo_van-track'] == 1, 'veh_tipo'] = 'VAN-TRACK'
 customer_df.loc[customer_df['d_tipo_autocar'] == 1, 'veh_tipo'] = 'AUTOCAR'
-customer_df.loc[customer_df['d_tipo_remolque'] == 1, 'veh_tipo'] = 'REMOLQUE'
-customer_df.loc[customer_df['d_tipo_agricola'] == 1, 'veh_tipo'] = 'AGRICOLA'
+customer_df.loc[customer_df['d_tipo_agricola'] == 1, 'veh_tipo'] = 'AGRICULTURAL'
 customer_df.loc[customer_df['d_tipo_industrial'] == 1, 'veh_tipo'] = 'INDUSTRIAL'
-customer_df.loc[customer_df['d_tipo_triciclo'] == 1, 'veh_tipo'] = 'TRICICLO'
 
 # CLEAN EDAD PERMISO
 customer_df = customer_df[customer_df['cliente_edad'] - customer_df['antiguedad_permiso'] >= 17]
@@ -229,7 +252,6 @@ customer_df['cliente_cp'] = customer_df['cliente_cp'].str.strip()
 customer_df = customer_df.dropna(subset=['cliente_cp'])
 customer_df['cliente_cp'] = customer_df['cliente_cp'].map(int)
 customer_df = customer_df[customer_df['cliente_cp'] != 0]
-
 
 # KEEP CUSTOMERS
 customer_df = customer_df.sort_values(by=['cliente_poliza'], ascending=[False])
