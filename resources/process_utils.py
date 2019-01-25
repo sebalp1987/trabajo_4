@@ -24,14 +24,11 @@ def output_normal_anormal_new(df: pd.DataFrame, output_file=True, key_var_split=
     print('normal shape ', normal.shape)
 
     if output_file:
-        normal_file = STRING.path_db + '\\normal.csv'
-        anormal_file = STRING.path_db + '\\anormal.csv'
-
-        anomaly.describe().to_csv(STRING.path_db_aux + '\\anormal_avg.csv', index=False, sep=';')
-        normal.describe().to_csv(STRING.path_db_aux + '\\normal_avg.csv', index=False, sep=';')
+        anomaly.describe().to_csv(STRING.anormal_describe, index=False, sep=';')
+        normal.describe().to_csv(STRING.normal_describe, index=False, sep=';')
         print(anomaly.describe())
-        anomaly.to_csv(anormal_file, sep=';', index=False)
-        normal.to_csv(normal_file, sep=';', index=False)
+        anomaly.to_csv(STRING.anormal_file, sep=';', index=False)
+        normal.to_csv(STRING.normal_file, sep=';', index=False)
 
     return normal, anomaly
 
@@ -68,13 +65,9 @@ def training_test_valid(df: pd.DataFrame, output_file=True, key_var_split='targe
     print('Proportion os anomaly in test set: %.2f\n', test['target'].mean())
 
     if output_file:
-        train_file = STRING.path_db + '\\train.csv'
-        test_file = STRING.path_db + '\\test.csv'
-        valid_file = STRING.path_db + '\\valid.csv'
-
-        train.to_csv(train_file, sep=';', index=False)
-        test.to_csv(test_file, sep=';', index=False)
-        valid.to_csv(valid_file, sep=';', index=False)
+        train.to_csv(STRING.train, sep=';', index=False)
+        test.to_csv(STRING.test, sep=';', index=False)
+        valid.to_csv(STRING.valid, sep=';', index=False)
 
     return train, valid, test
 

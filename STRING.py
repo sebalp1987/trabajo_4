@@ -3,7 +3,7 @@ import os
 LOCAL = os.path.dirname(os.path.abspath(__file__))
 
 # PATH NAMES
-path_db = LOCAL + '/data_training/'
+path_training = LOCAL + '/data_training/'
 path_db_extra = LOCAL + '/data_extra/'
 
 file_claim = LOCAL + '/data_extra/clientesiniestro_od.csv'
@@ -26,6 +26,16 @@ processed_offer = path_db_extra + 'oferta_processed.csv'
 processed_target = path_db_extra + 'oferta_processed_target.csv'
 
 summary_statistics_offers = path_db_extra + 'summary_statistics_offers.csv'
+
+normal_file = path_training + 'normal.csv'
+anormal_file = path_training + 'anormal.csv'
+normal_describe = path_db_extra + 'normal_avg.csv'
+anormal_describe = path_db_extra + 'anormal_avg.csv'
+
+train = path_training + 'train.csv'
+valid = path_training + 'valid.csv'
+test = path_training + 'test.csv'
+
 
 # PARAMETERS
 configure_names = {'cliente_numero_siniestros_auto': 'Sum of vehicle claims per year',
