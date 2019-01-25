@@ -135,8 +135,9 @@ customer_df['d_uso_alquiler'] = np.where(customer_df['vehiculo_uso_desc'].str.co
 customer_df['d_uso_publico'] = np.where(customer_df['vehiculo_uso_desc'].str.contains('PUBLICO'), 1, 0)
 
 # VEHICLE TYPE
-tipo_dict = {'TURISMO PARTICULAR': 'car', 'CICLOMOTOR':'motorbike', 'FURGONETA': 'van-track',  'CAMION': 'van-track', 'AUTOCAR': 'autocar',
-             'REMOLQUE': 'van-track',  'AGRICO':'agricola',  'INDUSTRIAL': 'industrial',  'TRICICLO': 'motorbike'}
+tipo_dict = {'TURISMO PARTICULAR': 'car', 'CICLOMOTOR': 'motorbike', 'FURGONETA': 'van-track', 'CAMION': 'van-track',
+             'AUTOCAR': 'autocar',
+             'REMOLQUE': 'van-track', 'AGRICO': 'agricola', 'INDUSTRIAL': 'industrial', 'TRICICLO': 'motorbike'}
 
 for k, v in tipo_dict.items():
     customer_df['d_tipo_' + v] = pd.Series(0, index=customer_df.index)
@@ -235,7 +236,6 @@ customer_df.loc[customer_df['d_uso_publico'] == 1, 'veh_uso'] = 'PUBLIC'
 
 
 # VEHICULO TIPO
-
 customer_df['veh_tipo'] = pd.Series('OTHER', index=customer_df.index)
 customer_df.loc[customer_df['d_tipo_car'] == 1, 'veh_tipo'] = 'CAR'
 customer_df.loc[customer_df['d_tipo_motorbike'] == 1, 'veh_tipo'] = 'MOTORBIKE'

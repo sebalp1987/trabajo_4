@@ -5,9 +5,9 @@ import matplotlib.pyplot as plot
 import seaborn as sns
 
 sns.set()
-pd.set_option('max_colwidth', 10)
+pd.set_option('display.max_columns', 100)
 
-customer_df = pd.read_csv(STRING.path_db_extra + '\\historical_data.csv', sep=';', encoding='latin1')
+customer_df = pd.read_csv(STRING.processed_historical, sep=';', encoding='latin1')
 
 # SUBSET VARIABLES
 x = customer_df[[
@@ -69,8 +69,10 @@ print('POSTAL CODE CLUSTER')
 cluster_analysis.hopkins(cp_risk.drop(['cliente_cp'], axis=1))
 cluster_analysis.cluster_internal_validation(cp_risk.drop(['cliente_cp'], axis=1), n_clusters=n_clusters_max)
 fig_cp = cluster_analysis.kmeans_plus_plus(cp_risk, k=6, n_init=1, max_iter=1000, drop='cliente_cp',
-                                  show_plot=True,
-                                  file_name='clusters_zip code', reindex_label=['cliente_numero_siniestros_auto', 'cliente_numero_polizas_auto'])
+                                           show_plot=True,
+                                           file_name='clusters_zip code',
+                                           reindex_label=['cliente_numero_siniestros_auto',
+                                                          'cliente_numero_polizas_auto'])
 
 # RISK CLUSTERING BY INTERMEDIARY #####################################################################################
 x_mediador = customer_df[
@@ -108,7 +110,8 @@ x_object = customer_df[
 x_object = x_object.sort_values(by=['cliente_poliza'], ascending=[False])
 x_object = x_object.drop_duplicates(subset=['cliente_codfiliacion', 'vehiculo_modelo_desc'], keep='first')
 x_object['counter'] = pd.Series(1, index=x_object.index)
-
+x_object = x_object.sort_values(by='vehiculo_marca_desc', ascending=True)
+print(x_object)
 x_object = x_object.groupby(
     ['vehiculo_valor_range', 'vehiculo_categoria', 'vehiculo_marca_desc',
      'veh_uso', 'veh_tipo', 'vehiculo_heavy', 'antiguedad_vehiculo']).agg(
@@ -117,11 +120,13 @@ x_object = x_object.groupby(
 
 x_object.columns = x_object.columns.droplevel(1)
 # We quit one outlier case
+
 x_object = x_object[(x_object['cliente_numero_siniestros_auto'] / x_object['cliente_numero_polizas_auto']) < 10]
-x_object = x_object[x_object['counter'] > 5]
+# x_object = x_object[x_object['counter'] > 5]
 del x_object['counter']
 x_object = x_object.reset_index(drop=False)
-
+x_object = x_object.sort_values(by='vehiculo_marca_desc', ascending=True)
+print(x_object)
 print('VEHICLE CLUSTER')
 cluster_analysis.hopkins(x_object.drop(['vehiculo_valor_range', 'vehiculo_categoria', 'vehiculo_marca_desc',
                                         'veh_uso', 'veh_tipo', 'vehiculo_heavy', 'antiguedad_vehiculo'], axis=1))
@@ -141,9 +146,11 @@ x_object['vehiculo_valor_range'] = [x.replace(')', ']') for x in x_object['vehic
 x_object['vehiculo_valor_range'] = [x.replace('(', '[') for x in x_object['vehiculo_valor_range']]
 x_object = x_object.sort_values(by=['cliente_numero_siniestros_auto_cliente_numero_polizas_auto'], ascending=[True])
 
-for col in x_object.drop(['cliente_numero_siniestros_auto', 'cliente_numero_polizas_auto', 'cliente_numero_siniestros_auto_cliente_numero_polizas_auto'], axis=1).columns.values.tolist():
+for col in x_object.drop(['cliente_numero_siniestros_auto', 'cliente_numero_polizas_auto',
+                          'cliente_numero_siniestros_auto_cliente_numero_polizas_auto'],
+                         axis=1).columns.values.tolist():
     print(col)
-    
+
     try:
         x_label = config_names[col]
     except KeyError:
@@ -151,11 +158,20 @@ for col in x_object.drop(['cliente_numero_siniestros_auto', 'cliente_numero_poli
     try:
         if col is not 'vehiculo_marca_desc':
             g = sns.catplot(y='cliente_numero_siniestros_auto_cliente_numero_polizas_auto', x=col,
-                       data=x_object)
+                            data=x_object)
             g.set(ylabel='Claims / Policies per year', xlabel=x_label)
         else:
             g = sns.catplot(x='cliente_numero_siniestros_auto_cliente_numero_polizas_auto', y=col, data=x_object)
             g.set(xlabel='Claims / Policies per year', ylabel=x_label)
+        if col is 'vehiculo_valor_range':
+            range_values = []
+            for i in range(0, 69000, 1000):
+                range_values.append('[' + str(i) + ', ' + str(i + 1000) + ']')
+            steps = 5
+            g = sns.catplot(y='cliente_numero_siniestros_auto_cliente_numero_polizas_auto', x=col, data=x_object,
+                            order=range_values)
+            g.set_xticklabels(rotation=30, step=steps)
+            g.set(ylabel='Claims / Policies per year', xlabel=x_label)
     except TypeError:
         plot.close()
         if col is 'vehiculo_valor_range':
@@ -228,23 +244,27 @@ cluster_analysis.cluster_internal_validation(x_customer.drop(
      'cliente_extranjero'
      ], axis=1), n_clusters=n_clusters_max)
 x_customer = cluster_analysis.kmeans_plus_plus(x_customer, k=6, n_init=1, max_iter=1000,
-                                  drop=['cliente_edad_range', 'antiguedad_permiso_range', 'antiguedad_permiso_riesgo',
-                                        'edad_segundo_conductor_riesgo', 'cliente_sexo',
-                                        'antiguedad_permiso_segundo_riesgo',
-                                        'cliente_extranjero', 'edad_conductor_riesgo'
-                                        ], show_plot=True,
-                                  file_name='clusters_customer',
-                                  reindex_label=['cliente_numero_siniestros_auto', 'cliente_numero_polizas_auto'])
+                                               drop=['cliente_edad_range', 'antiguedad_permiso_range',
+                                                     'antiguedad_permiso_riesgo',
+                                                     'edad_segundo_conductor_riesgo', 'cliente_sexo',
+                                                     'antiguedad_permiso_segundo_riesgo',
+                                                     'cliente_extranjero', 'edad_conductor_riesgo'
+                                                     ], show_plot=True,
+                                               file_name='clusters_customer',
+                                               reindex_label=['cliente_numero_siniestros_auto',
+                                                              'cliente_numero_polizas_auto'])
 
 # EXTRA PLOTS
-for col in x_customer.drop(['cliente_numero_siniestros_auto', 'cliente_numero_polizas_auto', 'cliente_numero_siniestros_auto_cliente_numero_polizas_auto'], axis=1).columns.values.tolist():
+for col in x_customer.drop(['cliente_numero_siniestros_auto', 'cliente_numero_polizas_auto',
+                            'cliente_numero_siniestros_auto_cliente_numero_polizas_auto'],
+                           axis=1).columns.values.tolist():
     print(col)
     try:
         x_label = config_names[col]
     except KeyError:
         x_label = col
-    range_values=None
-    steps=None
+    range_values = None
+    steps = None
 
     g = sns.catplot(y='cliente_numero_siniestros_auto_cliente_numero_polizas_auto', x=col, data=x_customer,
                     order=range_values)
