@@ -14,9 +14,6 @@ def over_sampling(xTrain, yTrain, model='ADASYN', neighbors=200):
     :return: xTrain and yTrain oversampled
     """
 
-    xTrainNames = xTrain.columns.values.tolist()
-    yTrainNames = ['target']
-
     if model == 'ADASYN':
         model = ADASYN(random_state=42, ratio='minority', n_neighbors=neighbors)
 
@@ -24,9 +21,6 @@ def over_sampling(xTrain, yTrain, model='ADASYN', neighbors=200):
         model = SMOTE(random_state=42, ratio='minority', k_neighbors=neighbors, m_neighbors='svm')
 
     xTrain, yTrain = model.fit_sample(xTrain, yTrain)
-
-    xTrain = pd.DataFrame(xTrain, columns=[xTrainNames])
-    yTrain = pd.DataFrame(yTrain, columns=[yTrainNames])
 
     return xTrain, yTrain
 

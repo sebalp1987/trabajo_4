@@ -143,6 +143,7 @@ if __name__ == '__main__':
                             callbacks=[early_stopping_monitor],
                             shuffle=True, validation_data=[valid, None]).history
 
+    # Plot Loss
     plot.plot(history['loss'])
     plot.plot(history['val_loss'])
     plot.title('model loss')
@@ -151,6 +152,7 @@ if __name__ == '__main__':
     plot.legend(['train', 'valid'], loc='upper right')
     plot.show()
 
+    # VAE Loss
     prediction_true = vae_model.predict(valid)
     prediction_test = vae_model.predict(test_normal.drop(['oferta_id', 'target'], axis=1))
     prediction_anormal = vae_model.predict(test_anormal.drop(['oferta_id', 'target'], axis=1))
@@ -172,7 +174,7 @@ if __name__ == '__main__':
     mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.3, random_state=42)
     mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.3, random_state=42)
     error_df_valid = pd.concat([mse_test_valid, mse_anormal_valid], axis=0).reset_index(drop=True)
-    error_df_test= pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
+    error_df_test = pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
     error_df_test['target'] = error_df_test['target'].map(int)
     error_df_valid['target'] = error_df_valid['target'].map(int)
 
@@ -187,7 +189,7 @@ if __name__ == '__main__':
     # PLOT ERROR WITH ANOMALIES
     fig = plot.figure()
     ax = fig.add_subplot(111)
-    fraud_error_df =  error_df[(error_df['target'] == 1) & (error_df['reconstruction_error'])]
+    fraud_error_df = error_df[(error_df['target'] == 1) & (error_df['reconstruction_error'])]
     _ = ax.hist(fraud_error_df.reconstruction_error.values, bins=10)
     plot.show()
     plot.close()
@@ -214,7 +216,6 @@ if __name__ == '__main__':
 
     scores = []
 
-
     for threshold in thresholds:
         y_hat = [1 if e > threshold else 0 for e in error_df_valid.reconstruction_error.values]
         scores.append([
@@ -236,6 +237,7 @@ if __name__ == '__main__':
     print('RECALL ', recall)
     print('FBSCORE ', fbeta)
 
+    # Reconstruction Error plot
     groups = error_df.groupby('target')
     fig, ax = plot.subplots()
     for name, group in groups:
@@ -248,6 +250,7 @@ if __name__ == '__main__':
     plot.xlabel("Data point index")
     plot.show()
 
+    # Confussion Matrix
     conf_matrix = confusion_matrix(error_df_test.target, predicted)
     plot.figure(figsize=(12, 12))
     sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True,
@@ -257,20 +260,22 @@ if __name__ == '__main__':
     plot.xlabel('Predicted class')
     plot.show()
 
+    # Lift Curve
     y_hat_df = pd.DataFrame(None, index=error_df_test.index, columns=['y_hat_1'])
     y_hat_df['y_hat_1'] = error_df_test['reconstruction_error']
     y_hat_df['y_hat_0'] = error_df_test['reconstruction_error']
     error_df_test['predicted'] = pd.Series(predicted, index=error_df_test.index)
+
     skplt.metrics.plot_cumulative_gain(y_true=error_df_test.target.values, y_probas=y_hat_df[['y_hat_0', 'y_hat_1']])
     plot.show()
     plot.close()
     skplt.metrics.plot_lift_curve(y_true=error_df_test.target.values, y_probas=y_hat_df[['y_hat_0', 'y_hat_1']])
     plot.show()
-    error_df_test = error_df_test.sort_values(by=['reconstruction_error'], ascending=False).reset_index(drop=True).reset_index(drop=False)
+
+    error_df_test = error_df_test.sort_values(by=['reconstruction_error'], ascending=False).reset_index(
+        drop=True).reset_index(drop=False)
     error_df_test['percentage_sample'] = (error_df_test['index'] + 1) / error_df_test['index'].max()
     error_df_test['tptn'] = pd.Series(0, index=error_df_test.index)
     error_df_test.loc[error_df_test['predicted'] == error_df_test['target'], 'tptn'] = 1
     error_df_test['tptn_sum'] = error_df_test['tptn'].cumsum() / (error_df_test['index'] + 1)
     error_df_test.to_csv(STRING.lift_curve, index=False, sep=';')
-
-
