@@ -58,12 +58,6 @@ if __name__ == '__main__':
     # LOAD FILE
     normal = pd.read_csv(STRING.normal_file, sep=';', encoding='latin1')
     anormal = pd.read_csv(STRING.anormal_file, sep=';', encoding='latin1')
-    count_classes = pd.value_counts(pd.concat([normal['target'], anormal['target']], axis=0), sort=True)
-    count_classes.plot(kind='bar', rot=0)
-    plot.xticks(range(2), ['Normal', 'Anormal'])
-    plot.xlabel('Class')
-    plot.ylabel('Frequency')
-    plot.show()
 
     # NORMALIZE
     normal['CONTROL'] = pd.Series(0, index=normal.index)
@@ -89,6 +83,10 @@ if __name__ == '__main__':
     normal = normal[features]
     test_anormal = anormal[features]
 
+    y_pred_score = np.empty(shape=[0, 2])
+    predicted_index = np.empty(shape=[0, ])
+
+    # We divide the normal and the abnormal dataset
     train, valid, _, _ = train_test_split(normal, normal, test_size=0.30, random_state=42)
     valid, test_normal, _, _ = train_test_split(valid, valid, test_size=len(anormal.index), random_state=42)
     valid = valid.drop(['oferta_id', 'target'], axis=1)
@@ -170,6 +168,14 @@ if __name__ == '__main__':
     mse_anormal['target'] = pd.Series(1, index=mse_anormal.index)
     error_df = pd.concat([mse_test, mse_anormal], axis=0)
 
+    # We separate the values
+    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.3, random_state=42)
+    mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.3, random_state=42)
+    error_df_valid = pd.concat([mse_test_valid, mse_anormal_valid], axis=0).reset_index(drop=True)
+    error_df_test= pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
+    error_df_test['target'] = error_df_test['target'].map(int)
+    error_df_valid['target'] = error_df_valid['target'].map(int)
+
     # PLOT ERROR WITHOUT ANOMALIES
     fig = plot.figure()
     ax = fig.add_subplot(111)
@@ -181,13 +187,13 @@ if __name__ == '__main__':
     # PLOT ERROR WITH ANOMALIES
     fig = plot.figure()
     ax = fig.add_subplot(111)
-    fraud_error_df = error_df[error_df['target'] == 1]
+    fraud_error_df =  error_df[(error_df['target'] == 1) & (error_df['reconstruction_error'])]
     _ = ax.hist(fraud_error_df.reconstruction_error.values, bins=10)
     plot.show()
     plot.close()
 
     # RECALL-PRECISION
-    precision, recall, th = precision_recall_curve(error_df.target, error_df.reconstruction_error)
+    precision, recall, th = precision_recall_curve(error_df_valid.target, error_df_valid.reconstruction_error)
     plot.plot(recall, precision, 'b', label='Precision-Recall curve')
     plot.title('Recall vs Precision')
     plot.xlabel('Recall')
@@ -208,32 +214,24 @@ if __name__ == '__main__':
 
     scores = []
 
+
     for threshold in thresholds:
-        y_hat = [1 if e > threshold else 0 for e in error_df.reconstruction_error.values]
+        y_hat = [1 if e > threshold else 0 for e in error_df_valid.reconstruction_error.values]
         scores.append([
-            recall_score(y_pred=y_hat, y_true=error_df.target.values),
-            precision_score(y_pred=y_hat, y_true=error_df.target.values),
-            fbeta_score(y_pred=y_hat, y_true=error_df.target.values,
+            recall_score(y_pred=y_hat, y_true=error_df_valid.target.values),
+            precision_score(y_pred=y_hat, y_true=error_df_valid.target.values),
+            fbeta_score(y_pred=y_hat, y_true=error_df_valid.target.values,
                         beta=1, average='binary')
         ])
-
-    y_hat_df = pd.DataFrame(None, index=error_df.index, columns=['y_hat_1'])
-    y_hat_df['y_hat_1'] = error_df['reconstruction_error']
-    y_hat_df['y_hat_0'] = error_df['reconstruction_error']
-    skplt.metrics.plot_cumulative_gain(y_true=error_df.target.values, y_probas=y_hat_df[['y_hat_0', 'y_hat_1']])
-    plot.show()
-    plot.close()
-    skplt.metrics.plot_lift_curve(y_true=error_df.target.values, y_probas=y_hat_df[['y_hat_0', 'y_hat_1']])
-    plot.show()
 
     scores = np.array(scores)
     threshold = thresholds[scores[:, 2].argmax()]
     print('final Threshold ', threshold)
-    predicted = [1 if e > threshold else 0 for e in error_df.reconstruction_error.values]
+    predicted = [1 if e > threshold else 0 for e in error_df_test.reconstruction_error.values]
 
-    precision = precision_score(error_df.target.values, predicted)
-    recall = recall_score(error_df.target.values, predicted)
-    fbeta = fbeta_score(error_df.target.values, predicted, beta=1)
+    precision = precision_score(error_df_test.target.values, predicted)
+    recall = recall_score(error_df_test.target.values, predicted)
+    fbeta = fbeta_score(error_df_test.target.values, predicted, beta=1)
     print('PRECISION ', precision)
     print('RECALL ', recall)
     print('FBSCORE ', fbeta)
@@ -250,11 +248,29 @@ if __name__ == '__main__':
     plot.xlabel("Data point index")
     plot.show()
 
-    conf_matrix = confusion_matrix(error_df.target, predicted)
+    conf_matrix = confusion_matrix(error_df_test.target, predicted)
     plot.figure(figsize=(12, 12))
     sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True,
-                fmt="d")
+                fmt="d", cmap="Blues")
     plot.title("Confusion matrix")
     plot.ylabel('True class')
     plot.xlabel('Predicted class')
     plot.show()
+
+    y_hat_df = pd.DataFrame(None, index=error_df_test.index, columns=['y_hat_1'])
+    y_hat_df['y_hat_1'] = error_df_test['reconstruction_error']
+    y_hat_df['y_hat_0'] = error_df_test['reconstruction_error']
+    error_df_test['predicted'] = pd.Series(predicted, index=error_df_test.index)
+    skplt.metrics.plot_cumulative_gain(y_true=error_df_test.target.values, y_probas=y_hat_df[['y_hat_0', 'y_hat_1']])
+    plot.show()
+    plot.close()
+    skplt.metrics.plot_lift_curve(y_true=error_df_test.target.values, y_probas=y_hat_df[['y_hat_0', 'y_hat_1']])
+    plot.show()
+    error_df_test = error_df_test.sort_values(by=['reconstruction_error'], ascending=False).reset_index(drop=True).reset_index(drop=False)
+    error_df_test['percentage_sample'] = (error_df_test['index'] + 1) / error_df_test['index'].max()
+    error_df_test['tptn'] = pd.Series(0, index=error_df_test.index)
+    error_df_test.loc[error_df_test['predicted'] == error_df_test['target'], 'tptn'] = 1
+    error_df_test['tptn_sum'] = error_df_test['tptn'].cumsum() / (error_df_test['index'] + 1)
+    error_df_test.to_csv(STRING.lift_curve, index=False, sep=';')
+
+

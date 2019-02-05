@@ -26,6 +26,7 @@ processed_offer = path_db_extra + 'oferta_processed.csv'
 processed_target = path_db_extra + 'oferta_processed_target.csv'
 
 summary_statistics_offers = path_db_extra + 'summary_statistics_offers.csv'
+lift_curve = path_db_extra + 'lift_curve.csv'
 
 normal_file = path_training + 'normal.csv'
 anormal_file = path_training + 'anormal.csv'

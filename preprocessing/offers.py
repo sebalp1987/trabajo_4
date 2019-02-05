@@ -385,6 +385,7 @@ offer_df = offer_df.replace('?', 0)
 offer_df = offer_df.dropna()
 print(len(offer_df.index))
 
+'''
 drop_variables = ['oferta_estado', 'oferta_inicio', 'oferta_prod_com', 'oferta_prod_nombre', 'oferta_tomador_tipo_doc',
                   'oferta_tomador_fecha_nac', 'oferta_tomador_lugar_nac', 'oferta_idioma', 'oferta_propietario_fecha_nac',
                   'oferta_propietario_fecha_carne', 'oferta_conductor_fecha_nac', 'oferta_conductor_fecha_carne',
@@ -398,7 +399,9 @@ drop_variables = ['oferta_estado', 'oferta_inicio', 'oferta_prod_com', 'oferta_p
                   'vehiculo_uso_desc', 'veh_tipo', 'vehiculo_clase_agrupacion_descripcion']
 
 offer_df = offer_df.drop(drop_variables, axis=1)
+'''
 
 offer_df.describe(include='all').transpose().to_csv(STRING.summary_statistics_offers, sep=';', encoding='utf-8')
 offer_df.to_csv(STRING.processed_offer, sep=';', index=False)
+
 

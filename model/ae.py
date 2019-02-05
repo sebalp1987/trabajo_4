@@ -196,6 +196,14 @@ if __name__ == '__main__':
     error_df = pd.concat([mse_test, mse_anormal], axis=0)
     print(error_df.describe())
 
+    # We separate the values
+    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.3, random_state=42)
+    mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.3, random_state=42)
+    error_df_valid = pd.concat([mse_test_valid, mse_anormal_valid], axis=0).reset_index(drop=True)
+    error_df_test= pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
+    error_df_test['target'] = error_df_test['target'].map(int)
+    error_df_valid['target'] = error_df_valid['target'].map(int)
+
     # PLOT ERROR WITHOUT ANOMALIES
     fig = plot.figure()
     ax = fig.add_subplot(111)
@@ -213,7 +221,7 @@ if __name__ == '__main__':
     plot.close()
 
     # RECALL-PRECISION
-    precision, recall, th = precision_recall_curve(error_df.target, error_df.reconstruction_error)
+    precision, recall, th = precision_recall_curve(error_df_valid.target, error_df_valid.reconstruction_error)
     plot.plot(recall, precision, 'b', label='Precision-Recall curve')
     plot.title('Recall vs Precision')
     plot.xlabel('Recall')
@@ -235,22 +243,22 @@ if __name__ == '__main__':
     scores = []
 
     for threshold in thresholds:
-        y_hat = [1 if e > threshold else 0 for e in error_df.reconstruction_error.values]
+        y_hat = [1 if e > threshold else 0 for e in error_df_valid.reconstruction_error.values]
 
         scores.append([
-            recall_score(y_pred=y_hat, y_true=error_df.target.values),
-            precision_score(y_pred=y_hat, y_true=error_df.target.values),
-            fbeta_score(y_pred=y_hat, y_true=error_df.target.values,
+            recall_score(y_pred=y_hat, y_true=error_df_valid.target.values),
+            precision_score(y_pred=y_hat, y_true=error_df_valid.target.values),
+            fbeta_score(y_pred=y_hat, y_true=error_df_valid.target.values,
                         beta=1)])
 
     scores = np.array(scores)
     threshold = thresholds[scores[:, 2].argmax()]
     print('final Threshold ', threshold)
-    predicted = [1 if e > threshold else 0 for e in error_df.reconstruction_error.values]
+    predicted = [1 if e > threshold else 0 for e in error_df_test.reconstruction_error.values]
 
-    print('PRECISION ', precision_score(error_df.target.values, predicted))
-    print('RECALL ', recall_score(error_df.target.values, predicted))
-    print('FBSCORE ', fbeta_score(error_df.target.values, predicted, beta=1))
+    print('PRECISION ', precision_score(error_df_test.target.values, predicted))
+    print('RECALL ', recall_score(error_df_test.target.values, predicted))
+    print('FBSCORE ', fbeta_score(error_df_test.target.values, predicted, beta=1))
 
     groups = error_df.groupby('target')
     fig, ax = plot.subplots()
@@ -264,7 +272,7 @@ if __name__ == '__main__':
     plot.xlabel("Data point index")
     plot.show()
 
-    conf_matrix = confusion_matrix(error_df.target, predicted)
+    conf_matrix = confusion_matrix(error_df_test.target, predicted)
     plot.figure(figsize=(12, 12))
     sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True, fmt="d")
     plot.title("Confusion matrix")
