@@ -5,34 +5,61 @@ import matplotlib.pyplot as plot
 import seaborn as sns
 
 from resources.sampling import over_sampling, under_sampling
+
 from model.neural_net import NeuralNetwork
+from model.inception_model import InceptionModel
+from model.residual_connection_model import ResidualConnection
 
 from sklearn.model_selection import StratifiedKFold
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.metrics import recall_score, precision_score, fbeta_score, confusion_matrix
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.preprocessing import StandardScaler
 
 # Files
 label = 'target'
 train = pd.read_csv(STRING.train, sep=';', encoding='latin1')
 valid = pd.read_csv(STRING.valid, sep=';', encoding='latin1')
 test = pd.read_csv(STRING.test, sep=';', encoding='latin1')
-test = pd.concat([train, valid, test], axis=0).reset_index()
+test = pd.concat([train, valid, test], axis=0).reset_index(drop=True)
 x = test.drop([label] + ['oferta_id'], axis=1)
 y = test[[label]]
-
 
 # Parameters
 sns.set()
 tresholds = np.linspace(0.1, 1.0, 200)
 scores = []
 sampling = None
+seed = 42
+np.random.seed(seed)
+
+# Variance Reduction
+selection = VarianceThreshold(threshold=0.0)
+selection.fit(x)
+features = selection.get_support(indices=True)
+features = x.columns[features]
+x = x[features]
+train = train[features]
+test = test[features]
+valid = valid[features]
+
+for i in x.columns.values.tolist():
+    x[i] = x[i].map(float)
+    x[i] = StandardScaler().fit_transform(x[i].values.reshape(-1, 1))
+
 cols = x.shape[1]
+
 # Models
-fileModel1 = ExtraTreesClassifier(n_estimators=100, max_depth=50, bootstrap=False, oob_score=False,
+ert = ExtraTreesClassifier(n_estimators=100, max_depth=50, bootstrap=False, oob_score=False,
                                  class_weight='balanced_subsample')
-fileModel = NeuralNetwork(n_cols=cols, node_size=[100], activation='relu', prob_dropout=0.2)
+nn = NeuralNetwork(n_cols=cols, node_size=[100], activation='relu', prob_dropout=0.2)
 
+rc = ResidualConnection(n_cols=cols, activation='relu', prob_dropout=0.2,
+                        number_layers=10, node_size=100, nodes_range=range(1000, 100, -100))
+im = InceptionModel(n_cols=cols, activation='relu', node_size=100, branch_number=6,
+                    prob_dropout=0.2)
 
+fileModel = ert
 # We define the stratify folds
 y_pred_score = np.empty(shape=[0, 2])
 predicted_index = np.empty(shape=[0, ])
@@ -40,8 +67,6 @@ skf = StratifiedKFold(n_splits=5, random_state=42, shuffle=False)
 
 # For each Fold
 for train_index, test_index in skf.split(x.values, y[label].values):
-    print('1')
-
     x_train, x_test = x.loc[train_index].values, x.loc[test_index].values
     y_train, y_test = y.loc[train_index].values, y.loc[test_index].values
 
@@ -62,9 +87,9 @@ for train_index, test_index in skf.split(x.values, y[label].values):
         fileModel.fit(x_train, y_train)
         y_pred_score_i = fileModel.predict_proba(x_test)
     except:
-        fileModel.fit_model(x_train, y_train, learning_rate=0.001, loss_function='cosine_proximity',
-                            epochs=100,
-                            batch_size=1000, verbose=True, validation_data=None)
+        fileModel.fit_model(x_train, y_train, learning_rate=0.001, loss_function='mean_squared_error',
+                            epochs=1000,
+                            batch_size=100, verbose=True, validation_data=None)
         y_pred_score_i = fileModel.predict_model(x_test)
         print(y_pred_score_i)
 
@@ -73,18 +98,15 @@ for train_index, test_index in skf.split(x.values, y[label].values):
     del x_train, x_test, y_train, y_test
 
 # We keep only one class probability
-y_pred_score = np.delete(y_pred_score, 0, axis=1)
+y_pred_score = y_pred_score[:, 1]
 
 # We check the optimal threshold
 for treshold in tresholds:
     y_hat = (y_pred_score > treshold).astype(int)
-    y_hat = y_hat.tolist()
-    y_hat = [item for sublist in y_hat for item in sublist]
-
     scores.append([
-            recall_score(y_pred=y_hat, y_true=test[label].values),
-            precision_score(y_pred=y_hat, y_true=test[label].values),
-            fbeta_score(y_pred=y_hat, y_true=test[label].values,
+            recall_score(y_pred=y_hat, y_true=y[label].values),
+            precision_score(y_pred=y_hat, y_true=y[label].values),
+            fbeta_score(y_pred=y_hat, y_true=y[label].values,
                         beta=1)])
 
 scores = np.array(scores)
@@ -103,8 +125,6 @@ plot.close()
 final_tresh = tresholds[scores[:, 2].argmax()]
 print('Threshold', final_tresh)
 y_hat_test = (y_pred_score > final_tresh).astype(int)
-y_hat_test = y_hat_test.tolist()
-y_hat_test = [item for sublist in y_hat_test for item in sublist]
 
 precision = precision_score(y.values, y_hat_test)
 recall = recall_score(y.values, y_hat_test)
