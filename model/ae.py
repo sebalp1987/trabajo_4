@@ -116,14 +116,6 @@ class DeepAutoencoder(object):
         history = autoencoder.fit(x, x, epochs=epochs, batch_size=batch_size, verbose=verbose, callbacks=callback_list,
                                   shuffle=True, validation_data=x_valid).history
 
-        plot.plot(history['loss'])
-        plot.plot(history['val_loss'])
-        plot.title('model loss')
-        plot.ylabel('loss')
-        plot.xlabel('epoch')
-        plot.legend(['train', 'valid'], loc='upper right')
-        plot.show()
-
 
 if __name__ == '__main__':
 
@@ -186,21 +178,22 @@ if __name__ == '__main__':
     mse_test = np.mean(np.power(test_normal.drop(['oferta_id', 'target'], axis=1) - prediction_test, 2), axis=1)
     mse_anormal = np.mean(np.power(test_anormal.drop(['oferta_id', 'target'], axis=1) - prediction_anormal, 2), axis=1)
 
-    mse_true = pd.DataFrame(mse_true, columns=['reconstruction_error'])
-    mse_test = pd.DataFrame(mse_test, columns=['reconstruction_error'])
-    mse_anormal = pd.DataFrame(mse_anormal, columns=['reconstruction_error'])
+    mse_true = pd.DataFrame(mse_true, columns=['reconstruction_error'], index=valid.index)
+    mse_test = pd.DataFrame(mse_test, columns=['reconstruction_error'], index=test_normal.index)
+    mse_test['oferta_id'] = pd.Series(test_normal['oferta_id'].values.tolist(), index=mse_test.index)
+    mse_anormal = pd.DataFrame(mse_anormal, columns=['reconstruction_error'], index=test_anormal.index)
+    mse_anormal['oferta_id'] = pd.Series(test_anormal['oferta_id'].values.tolist(), index=mse_anormal.index)
 
     mse_true['target'] = pd.Series(0, index=mse_true.index)
     mse_test['target'] = pd.Series(0, index=mse_test.index)
     mse_anormal['target'] = pd.Series(1, index=mse_anormal.index)
     error_df = pd.concat([mse_test, mse_anormal], axis=0)
-    print(error_df.describe())
 
     # We separate the values
-    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.3, random_state=42)
-    mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.3, random_state=42)
+    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.5, random_state=42)
+    mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.5, random_state=42)
     error_df_valid = pd.concat([mse_test_valid, mse_anormal_valid], axis=0).reset_index(drop=True)
-    error_df_test= pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
+    error_df_test = pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
     error_df_test['target'] = error_df_test['target'].map(int)
     error_df_valid['target'] = error_df_valid['target'].map(int)
 
@@ -209,14 +202,16 @@ if __name__ == '__main__':
     ax = fig.add_subplot(111)
     normal_error_df = error_df[(error_df['target'] == 0) & (error_df['reconstruction_error'] < 10)]
     _ = ax.hist(normal_error_df.reconstruction_error.values, bins=10)
+    plot.savefig(STRING.img_path + 'ae_rc_error_normal.png')
     plot.show()
     plot.close()
 
     # PLOT ERROR WITH ANOMALIES
     fig = plot.figure()
     ax = fig.add_subplot(111)
-    fraud_error_df = error_df[error_df['target'] == 1]
+    fraud_error_df = error_df[(error_df['target'] == 1) & (error_df['reconstruction_error'])]
     _ = ax.hist(fraud_error_df.reconstruction_error.values, bins=10)
+    plot.savefig(STRING.img_path + 'ae_rc_error_anormal.png')
     plot.show()
     plot.close()
 
@@ -226,6 +221,7 @@ if __name__ == '__main__':
     plot.title('Recall vs Precision')
     plot.xlabel('Recall')
     plot.ylabel('Precision')
+    plot.savefig(STRING.img_path + 'ae_recall_precision.png')
     plot.show()
 
     plot.plot(th, precision[1:], 'b', label='Threshold-Precision curve')
@@ -233,33 +229,39 @@ if __name__ == '__main__':
     plot.title('Precision-Recall for different threshold values')
     plot.xlabel('Threshold')
     plot.ylabel('Precision-Recall')
+    plot.ylim(right=2)
     plot.legend(['precision', 'recall'], loc='upper right')
+    plot.savefig(STRING.img_path + 'ae_figure_1.png')
     plot.show()
 
     # OUTLIER DETECTION
     # We define a threshold for the reconstruction error. It will be based on the error plot
-    thresholds = np.linspace(0.1, 10.0, 200)
+    thresholds = np.linspace(0.001, 100.0, 10000)
 
     scores = []
 
     for threshold in thresholds:
         y_hat = [1 if e > threshold else 0 for e in error_df_valid.reconstruction_error.values]
-
         scores.append([
             recall_score(y_pred=y_hat, y_true=error_df_valid.target.values),
             precision_score(y_pred=y_hat, y_true=error_df_valid.target.values),
             fbeta_score(y_pred=y_hat, y_true=error_df_valid.target.values,
-                        beta=1)])
+                        beta=1, average='binary')
+        ])
 
     scores = np.array(scores)
     threshold = thresholds[scores[:, 2].argmax()]
     print('final Threshold ', threshold)
     predicted = [1 if e > threshold else 0 for e in error_df_test.reconstruction_error.values]
 
-    print('PRECISION ', precision_score(error_df_test.target.values, predicted))
-    print('RECALL ', recall_score(error_df_test.target.values, predicted))
-    print('FBSCORE ', fbeta_score(error_df_test.target.values, predicted, beta=1))
+    precision = precision_score(error_df_test.target.values, predicted)
+    recall = recall_score(error_df_test.target.values, predicted)
+    fbeta = fbeta_score(error_df_test.target.values, predicted, beta=1)
+    print('PRECISION ', precision)
+    print('RECALL ', recall)
+    print('FBSCORE ', fbeta)
 
+    # Reconstruction Error plot
     groups = error_df.groupby('target')
     fig, ax = plot.subplots()
     for name, group in groups:
@@ -270,12 +272,16 @@ if __name__ == '__main__':
     plot.title("Reconstruction error for different classes")
     plot.ylabel("Reconstruction error")
     plot.xlabel("Data point index")
+    plot.savefig(STRING.img_path + 'ae_final_result.png')
     plot.show()
 
+    # Confussion Matrix
     conf_matrix = confusion_matrix(error_df_test.target, predicted)
     plot.figure(figsize=(12, 12))
-    sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True, fmt="d")
+    sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True,
+                fmt="d", cmap="Blues", cbar=False)
     plot.title("Confusion matrix")
     plot.ylabel('True class')
     plot.xlabel('Predicted class')
+    plot.savefig(STRING.img_path + 'ae_confussion_matrix.png')
     plot.show()

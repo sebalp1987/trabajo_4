@@ -78,14 +78,12 @@ if __name__ == '__main__':
     selection = VarianceThreshold(threshold=0.0)
     selection.fit(normal.drop(['oferta_id', 'target'], axis=1))
     features = selection.get_support(indices=True)
-    features = list(normal.columns[features]) + ['oferta_id', 'target']
-
+    features = list(normal.columns[features]) + ['target']
     normal = normal[features]
     test_anormal = anormal[features]
 
     y_pred_score = np.empty(shape=[0, 2])
     predicted_index = np.empty(shape=[0, ])
-
     # We divide the normal and the abnormal dataset
     train, valid, _, _ = train_test_split(normal, normal, test_size=0.30, random_state=42)
     valid, test_normal, _, _ = train_test_split(valid, valid, test_size=len(anormal.index), random_state=42)
@@ -93,7 +91,6 @@ if __name__ == '__main__':
     print(train.shape)
     print(valid.shape)
     print(test_normal.shape)
-
     # INPUT COLS
     cols = train.drop(['oferta_id', 'target'], axis=1).shape[1]
     input = Input(shape=(cols,))
@@ -150,6 +147,7 @@ if __name__ == '__main__':
     plot.ylabel('loss')
     plot.xlabel('epoch')
     plot.legend(['train', 'valid'], loc='upper right')
+    plot.savefig(STRING.img_path + 'error_convergence.png')
     plot.show()
 
     # VAE Loss
@@ -163,7 +161,9 @@ if __name__ == '__main__':
 
     mse_true = pd.DataFrame(mse_true, columns=['reconstruction_error'], index=valid.index)
     mse_test = pd.DataFrame(mse_test, columns=['reconstruction_error'], index=test_normal.index)
+    mse_test['oferta_id'] = pd.Series(test_normal['oferta_id'].values.tolist(), index=mse_test.index)
     mse_anormal = pd.DataFrame(mse_anormal, columns=['reconstruction_error'], index=test_anormal.index)
+    mse_anormal['oferta_id'] = pd.Series(test_anormal['oferta_id'].values.tolist(), index=mse_anormal.index)
 
     mse_true['target'] = pd.Series(0, index=mse_true.index)
     mse_test['target'] = pd.Series(0, index=mse_test.index)
@@ -171,8 +171,8 @@ if __name__ == '__main__':
     error_df = pd.concat([mse_test, mse_anormal], axis=0)
 
     # We separate the values
-    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.3, random_state=42)
-    mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.3, random_state=42)
+    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.5, random_state=42)
+    mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.5, random_state=42)
     error_df_valid = pd.concat([mse_test_valid, mse_anormal_valid], axis=0).reset_index(drop=True)
     error_df_test = pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
     error_df_test['target'] = error_df_test['target'].map(int)
@@ -183,6 +183,7 @@ if __name__ == '__main__':
     ax = fig.add_subplot(111)
     normal_error_df = error_df[(error_df['target'] == 0) & (error_df['reconstruction_error'] < 10)]
     _ = ax.hist(normal_error_df.reconstruction_error.values, bins=10)
+    plot.savefig(STRING.img_path + 'rc_error_normal.png')
     plot.show()
     plot.close()
 
@@ -191,6 +192,7 @@ if __name__ == '__main__':
     ax = fig.add_subplot(111)
     fraud_error_df = error_df[(error_df['target'] == 1) & (error_df['reconstruction_error'])]
     _ = ax.hist(fraud_error_df.reconstruction_error.values, bins=10)
+    plot.savefig(STRING.img_path + 'rc_error_anormal.png')
     plot.show()
     plot.close()
 
@@ -200,6 +202,7 @@ if __name__ == '__main__':
     plot.title('Recall vs Precision')
     plot.xlabel('Recall')
     plot.ylabel('Precision')
+    plot.savefig(STRING.img_path + 'recall_precision.png')
     plot.show()
 
     plot.plot(th, precision[1:], 'b', label='Threshold-Precision curve')
@@ -207,7 +210,9 @@ if __name__ == '__main__':
     plot.title('Precision-Recall for different threshold values')
     plot.xlabel('Threshold')
     plot.ylabel('Precision-Recall')
+    plot.xlim(left=0, right=2)
     plot.legend(['precision', 'recall'], loc='upper right')
+    plot.savefig(STRING.img_path + 'figure_1.png')
     plot.show()
 
     # OUTLIER DETECTION
@@ -248,16 +253,18 @@ if __name__ == '__main__':
     plot.title("Reconstruction error for different classes")
     plot.ylabel("Reconstruction error")
     plot.xlabel("Data point index")
+    plot.savefig(STRING.img_path + 'final_result.png')
     plot.show()
 
     # Confussion Matrix
     conf_matrix = confusion_matrix(error_df_test.target, predicted)
     plot.figure(figsize=(12, 12))
     sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True,
-                fmt="d", cmap="Blues")
+                fmt="d", cmap="Blues", cbar=False)
     plot.title("Confusion matrix")
     plot.ylabel('True class')
     plot.xlabel('Predicted class')
+    plot.savefig(STRING.img_path + 'confussion_matrix.png')
     plot.show()
 
     # Lift Curve
@@ -267,9 +274,11 @@ if __name__ == '__main__':
     error_df_test['predicted'] = pd.Series(predicted, index=error_df_test.index)
 
     skplt.metrics.plot_cumulative_gain(y_true=error_df_test.target.values, y_probas=y_hat_df[['y_hat_0', 'y_hat_1']])
+    plot.savefig(STRING.img_path + 'figure_1-1.png')
     plot.show()
     plot.close()
     skplt.metrics.plot_lift_curve(y_true=error_df_test.target.values, y_probas=y_hat_df[['y_hat_0', 'y_hat_1']])
+    plot.savefig(STRING.img_path + 'figure_1-2.png')
     plot.show()
 
     error_df_test = error_df_test.sort_values(by=['reconstruction_error'], ascending=False).reset_index(
@@ -278,4 +287,5 @@ if __name__ == '__main__':
     error_df_test['tptn'] = pd.Series(0, index=error_df_test.index)
     error_df_test.loc[error_df_test['predicted'] == error_df_test['target'], 'tptn'] = 1
     error_df_test['tptn_sum'] = error_df_test['tptn'].cumsum() / (error_df_test['index'] + 1)
+
     error_df_test.to_csv(STRING.lift_curve, index=False, sep=';')

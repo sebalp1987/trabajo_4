@@ -79,7 +79,7 @@ class ResidualConnection(object):
         print(self.model.summary())
 
     def fit_model(self, predictors, target, learning_rate=0.001, loss_function='categorical_crossentropy', epochs=500,
-                  batch_size=500, verbose=True, callback_list=[], validation_data=None, validation_split=None,
+                  batch_size=500, verbose=True, validation_data=None, validation_split=None,
                   class_weight=None):
         target = to_categorical(target)
         if validation_data is not None:
@@ -92,5 +92,5 @@ class ResidualConnection(object):
                        callbacks=[callback_list], verbose=verbose, class_weight=class_weight,
                        validation_split=validation_split)
 
-    def predict_model(self, x_test, y_test):
+    def predict_model(self, x_test):
         return self.model.predict(x_test)

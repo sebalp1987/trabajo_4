@@ -37,6 +37,7 @@ train = path_training + 'train.csv'
 valid = path_training + 'valid.csv'
 test = path_training + 'test.csv'
 
+img_path = os.path.dirname(os.path.dirname(LOCAL)) + '/3-latex/images/'
 
 # PARAMETERS
 configure_names = {'cliente_numero_siniestros_auto': 'Sum of vehicle claims per year',

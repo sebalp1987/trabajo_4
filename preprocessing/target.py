@@ -3,6 +3,7 @@ import STRING
 import seaborn as sns
 import matplotlib.pyplot as plot
 import numpy as np
+import random
 
 import resources.process_utils as putils
 
@@ -65,7 +66,9 @@ df = df.drop(['oferta_nivel_sinco_perc', 'oferta_nivel_sinco', 'oferta_poliza',
               ], axis=1)
 
 df = df.drop(['oferta_bonus_simulacion'], axis=1)
-df['oferta_id'] = np.random.randint(1, len(df.index), df.shape[0])
+df = df.drop_duplicates(subset=['oferta_id'])
+df['oferta_id'] = pd.Series(random.sample(range(0, len(df.index), 1), len(df.index)), index=df.index)
+
 keep_var = ['oferta_id', 'oferta_tomador_sexo', 'oferta_tom_cond', 'oferta_propietario_tom', 'oferta_propietario_cond',
             'oferta_veh_tara', 'oferta_veh_categoria', 'oferta_veh_puertos', 'antiguedad_permiso',
             'antiguedad_permiso_riesgo', 'edad_segundo_conductor_riesgo', 'cliente_extranjero', 'car_ranking',
@@ -76,17 +79,19 @@ keep_var = ['oferta_id', 'oferta_tomador_sexo', 'oferta_tom_cond', 'oferta_propi
             'vehiculo_heavy', 'oferta_sim_cia_actual', 'oferta_sim_siniestro_5_anio_culpa',
             'oferta_sim_anios_asegurado', 'oferta_sim_antiguedad_cia_actual', 'oferta_sim_siniestro_1_anio_culpa',
             'oferta_bonus_simulacion_perc', 'oferta_veh_valor_unitary', 'cliente_edad_18_30', 'cliente_edad_30_65',
-            'cliente_edad_65', 'antiguedad_vehiculo', 'oferta_adicional_riesgo', 'oferta_veh_marca',
-            'oferta_veh_modelo', 'oferta_veh_version', 'oferta_veh_accesorio', 'oferta_veh_tipo',
-            'oferta_veh_grupo_tarifa', 'oferta_veh_plazas', 'oferta_veh_potencia', 'oferta_veh_cilindrada',
+            'cliente_edad_65', 'antiguedad_vehiculo', 'oferta_adicional_riesgo',  'oferta_veh_plazas', 'oferta_veh_potencia', 'oferta_veh_cilindrada',
             'cliente_region_AFRICAARABE', 'cliente_region_AFRICASUBSHARIANA', 'cliente_region_AMERICADELSUR',
             'cliente_region_ASIAORIENTAL', 'cliente_region_EUROPACENTRAL', 'cliente_region_EUROPADELNORTE',
             'cliente_region_EUROPADELSUR', 'cliente_region_EUROPAOCCIDENTAL', 'cliente_region_EUROPAORIENTAL',
             'cliente_region_MARCARIBE', 'cliente_region_OCEANIA', 'cliente_region_nan', 'd_sin_cia',
             'clusters_zip code_risk',
             'clusters_intermediary_risk', 'clusters_customer_risk', 'clusters_vehicle_risk', 'target']
-df = df[keep_var]
 
+extras = ['oferta_veh_marca',
+            'oferta_veh_modelo', 'oferta_veh_version', 'oferta_veh_accesorio', 'oferta_veh_tipo',
+            'oferta_veh_grupo_tarifa']
+df = df[keep_var]
+print(df.shape)
 putils.output_normal_anormal_new(df)
 putils.training_test_valid(df)
 
