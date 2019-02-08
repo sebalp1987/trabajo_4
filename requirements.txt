@@ -9,3 +9,6 @@ tensorflow==1.10.0
 scikit-plot==0.3.7
 seaborn=0.9.0
 imbalanced-learn==0.4.3
+pydot==1.4.1
+pydot-ng==2.0.0
+graphviz==0.10.1

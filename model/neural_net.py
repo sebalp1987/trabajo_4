@@ -1,9 +1,9 @@
-from keras.utils import to_categorical
+from keras.utils import to_categorical, plot_model
 from keras import layers, Input, regularizers
 from keras.models import Model
 from keras.optimizers import SGD, Adam
-from keras.callbacks import EarlyStopping
-
+from keras.callbacks import EarlyStopping, TensorBoard
+import STRING
 
 class NeuralNetwork(object):
 
@@ -41,7 +41,7 @@ class NeuralNetwork(object):
         output_tensor = layers.Dense(2, activation='softmax')(x)
 
         self.model = Model(input_layer, output_tensor)
-
+        plot_model(self.model, to_file=STRING.img_path + 'nn_architecture.png', show_shapes=True)
         print(self.model.summary())
 
     def fit_model(self, predictors, target, learning_rate=0.001, loss_function='categorical_crossentropy', epochs=500,
@@ -52,9 +52,10 @@ class NeuralNetwork(object):
         callback_list = EarlyStopping(patience=2)
         optimizer = Adam(lr=learning_rate)
         self.model.compile(optimizer=optimizer, loss=loss_function, metrics=['accuracy'])
+        tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)
         self.model.fit(x=predictors, y=target, epochs=epochs, batch_size=batch_size,
                        validation_data=validation_data,
-                       callbacks=[callback_list], verbose=verbose, validation_split=validation_split,
+                       callbacks=[callback_list, tensorboard], verbose=verbose, validation_split=validation_split,
                        class_weight=class_weight)
 
     def predict_model(self, x_test):

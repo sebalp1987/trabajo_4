@@ -25,8 +25,19 @@ test = pd.concat([train, valid, test], axis=0).reset_index(drop=True)
 test = test.drop_duplicates(subset=['oferta_id'])
 
 # Final test file, we remove the cases from x
-x = test.drop([label] + ['oferta_id'], axis=1).reset_index(drop=True)
+test_final = pd.read_csv(STRING.lift_curve, sep=';', encoding='latin1')
+test_final = test_final[['oferta_id', 'target']]
+print(test.shape)
+test_final_true = test[test['oferta_id'].isin(test_final['oferta_id'].values.tolist())]
+test = test[-test['oferta_id'].isin(test_final['oferta_id'].values.tolist())]
+test = test.sample(frac=1).reset_index(drop=True)
+test_final_true = test_final_true.sample(frac=1).reset_index(drop=True)
+
+x = test.drop([label] + ['oferta_id'], axis=1)
+
 y = test[[label]]
+x_final_test = test_final_true.drop([label] + ['oferta_id'], axis=1)
+y_final_test = test_final_true[[label]]
 
 # Parameters
 sns.set()
@@ -35,7 +46,7 @@ scores = []
 sampling = None
 seed = 42
 np.random.seed(seed)
-model = 'nn'
+model = 'rc'
 
 # Variance Reduction
 selection = VarianceThreshold(threshold=0.0)
@@ -46,12 +57,15 @@ x = x[features]
 train = train[features]
 test = test[features]
 valid = valid[features]
+x_final_test = x_final_test[features]
+
 
 for i in x.columns.values.tolist():
     x[i] = x[i].map(float)
     scaler = StandardScaler()
     scaler.fit(x[i].values.reshape(-1, 1))
     x[i] = scaler.transform(x[i].values.reshape(-1, 1))
+    x_final_test[i] = scaler.transform(x_final_test[i].values.reshape(-1, 1))
 
 cols = x.shape[1]
 fileNames = np.array(x.columns.values)
@@ -59,7 +73,7 @@ fileNames = np.array(x.columns.values)
 # Models
 models = {'ert': ExtraTreesClassifier(n_estimators=500, max_depth=20, bootstrap=True, oob_score=True,
                                       class_weight='balanced_subsample', max_features='auto', random_state=42),
-          'nn': NeuralNetwork(n_cols=cols, node_size=[100], activation='relu', prob_dropout=0.2),
+          'nn': NeuralNetwork(n_cols=cols, node_size=[100, 100], activation='relu', prob_dropout=0.2),
           'rc': ResidualConnection(n_cols=cols, activation='relu', prob_dropout=0.2,
                                    number_layers=10, node_size=100, nodes_range=range(1000, 100, -100)),
           'ic': InceptionModel(n_cols=cols, activation='relu', node_size=100, branch_number=6,
@@ -78,6 +92,7 @@ skf = StratifiedKFold(n_splits=5, random_state=42, shuffle=False)
 for train_index, test_index in skf.split(x.values, y[label].values):
     x_train, x_test = x.loc[train_index].values, x.loc[test_index].values
     y_train, y_test = y.loc[train_index].values, y.loc[test_index].values
+    print(train_index, test_index)
     if sampling is None:
         pass
     elif sampling == 'ALLKNN':
@@ -97,7 +112,7 @@ for train_index, test_index in skf.split(x.values, y[label].values):
     except:
         fileModel.fit_model(x_train, y_train, learning_rate=0.001, loss_function='mean_squared_error',
                             epochs=500,
-                            batch_size=100, verbose=True, validation_data=None)
+                            batch_size=100, verbose=True, validation_data=None, validation_split=0.2)
         y_pred_score_i = fileModel.predict_model(x_test)
 
     y_pred_score = np.append(y_pred_score, y_pred_score_i, axis=0)
@@ -150,4 +165,42 @@ plot.title("Confusion matrix")
 plot.ylabel('True class')
 plot.xlabel('Predicted class')
 plot.savefig(STRING.img_path + 'confusion_matrix_' + model + '.png')
+plot.show()
+
+# FINAL TEST
+fileModel = models.get(model)
+print(x.shape)
+try:
+    min_sample_leaf = round(y.shape[0] * 0.01)
+    print(min_sample_leaf)
+    min_sample_split = min_sample_leaf * 10
+    fileModel.min_samples_leaf = min_sample_leaf
+    fileModel.min_samples_split = min_sample_split
+    fileModel.fit(x, y)
+    y_pred_score = fileModel.predict_proba(x_final_test)
+except:
+    fileModel.fit_model(x, y, learning_rate=0.001, loss_function='mean_squared_error',
+                        epochs=500,
+                        batch_size=100, verbose=True, validation_data=None, validation_split=0.2)
+    y_pred_score = fileModel.predict_model(x_final_test)
+
+y_pred_score = y_pred_score[:, 1]
+y_hat_test = (y_pred_score > final_tresh).astype(int)
+precision = precision_score(y_final_test.values, y_hat_test)
+recall = recall_score(y_final_test.values, y_hat_test)
+fbeta = fbeta_score(y_final_test.values, y_hat_test, beta=1)
+print('PRECISION ', precision)
+print('RECALL ', recall)
+print('FBSCORE ', fbeta)
+x_final_test = pd.concat([x_final_test, y_final_test, pd.Series(y_pred_score), pd.Series(y_hat_test)], axis=1)
+
+# Confussion Matrix
+conf_matrix = confusion_matrix(y_final_test.values, y_hat_test)
+plot.figure(figsize=(12, 12))
+sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True,
+            fmt="d", cmap="Blues", cbar=False)
+plot.title("Confusion matrix")
+plot.ylabel('True class')
+plot.xlabel('Predicted class')
+plot.savefig(STRING.img_path + 'confusion_matrix_test_' + model + '.png')
 plot.show()

@@ -1,16 +1,20 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plot
+import seaborn as sns
+
 from keras import Input, layers, regularizers, losses
 from keras.models import Model
 from keras.optimizers import SGD, Adam
-from keras.callbacks import EarlyStopping
-import STRING
+from keras.callbacks import EarlyStopping, TensorBoard
+from keras.utils import plot_model
+
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plot
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (confusion_matrix, precision_recall_curve, recall_score, precision_score, fbeta_score)
-import seaborn as sns
+
+import STRING
 
 sns.set()
 
@@ -103,6 +107,8 @@ class DeepAutoencoder(object):
         encode_layer, _ = DeepAutoencoder.encoded(self, input_tensor)
         decode_layer = DeepAutoencoder.decoded(self, encode_layer)
         autoencoder = Model(input_tensor, decode_layer)
+        plot_model(autoencoder, to_file=STRING.img_path + 'ae_architecture.png', show_shapes=True)
+
         print(autoencoder.summary())
 
         return autoencoder
@@ -161,7 +167,8 @@ if __name__ == '__main__':
 
     ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.2, dimension_node=4, encoding_dim=14)
     early_stopping_monitor = EarlyStopping(patience=2)
-    ae.fit(train.drop(['oferta_id', 'target'], axis=1), x_valid=[valid, valid], callback_list=[early_stopping_monitor],
+    tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)
+    ae.fit(train.drop(['oferta_id', 'target'], axis=1), x_valid=[valid, valid], callback_list=[early_stopping_monitor, tensorboard],
            batch_size=200, epochs=1000,
            learning_rate=0.001)
 
@@ -229,7 +236,7 @@ if __name__ == '__main__':
     plot.title('Precision-Recall for different threshold values')
     plot.xlabel('Threshold')
     plot.ylabel('Precision-Recall')
-    plot.ylim(right=2)
+    plot.xlim(left=0, right=2)
     plot.legend(['precision', 'recall'], loc='upper right')
     plot.savefig(STRING.img_path + 'ae_figure_1.png')
     plot.show()

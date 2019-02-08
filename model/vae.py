@@ -1,17 +1,22 @@
 import pandas as pd
+import matplotlib.pyplot as plot
+import seaborn as sns
+import numpy as np
+
 from keras import Input, layers, backend as K, objectives
 from keras.models import Model
 from keras.optimizers import SGD, Adam
-from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping, TensorBoard
+from keras.utils import plot_model
+
 from model.ae import DeepAutoencoder
 import STRING
+
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.model_selection import train_test_split
-import matplotlib.pyplot as plot
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (confusion_matrix, precision_recall_curve, recall_score, precision_score, fbeta_score)
-import seaborn as sns
-import numpy as np
+
 
 sns.set()
 latent_dim = 2
@@ -136,8 +141,10 @@ if __name__ == '__main__':
     vae_model.compile(optimizer=optimizer)
     print(vae_model.summary())
     early_stopping_monitor = EarlyStopping(patience=2)
+    plot_model(vae_model, to_file=STRING.img_path + 'vae_architecture.png', show_shapes=True)
+    tensorboard = TensorBoard(log_dir=STRING.tensorboard_path)
     history = vae_model.fit(train.drop(['oferta_id', 'target'], axis=1), epochs=1000, batch_size=100, verbose=True,
-                            callbacks=[early_stopping_monitor],
+                            callbacks=[early_stopping_monitor, tensorboard],
                             shuffle=True, validation_data=[valid, None]).history
 
     # Plot Loss
