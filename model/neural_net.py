@@ -52,10 +52,10 @@ class NeuralNetwork(object):
         callback_list = EarlyStopping(patience=2)
         optimizer = Adam(lr=learning_rate)
         self.model.compile(optimizer=optimizer, loss=loss_function, metrics=['accuracy'])
-        tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)
+        # tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)
         self.model.fit(x=predictors, y=target, epochs=epochs, batch_size=batch_size,
                        validation_data=validation_data,
-                       callbacks=[callback_list, tensorboard], verbose=verbose, validation_split=validation_split,
+                       callbacks=[callback_list], verbose=verbose, validation_split=validation_split,
                        class_weight=class_weight)
 
     def predict_model(self, x_test):

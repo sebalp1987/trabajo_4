@@ -26,7 +26,6 @@ processed_offer = path_db_extra + 'oferta_processed.csv'
 processed_target = path_db_extra + 'oferta_processed_target.csv'
 
 summary_statistics_offers = path_db_extra + 'summary_statistics_offers.csv'
-lift_curve = path_db_extra + 'lift_curve.csv'
 
 normal_file = path_training + 'normal.csv'
 anormal_file = path_training + 'anormal.csv'
@@ -36,6 +35,11 @@ anormal_describe = path_db_extra + 'anormal_avg.csv'
 train = path_training + 'train.csv'
 valid = path_training + 'valid.csv'
 test = path_training + 'test.csv'
+
+test_sample_1 = path_training + 'test_sample1.csv'
+test_sample_2 = path_training + 'test_sample2.csv'
+
+metric_save = path_db_extra + 'metric_save.csv'
 
 img_path = os.path.dirname(os.path.dirname(LOCAL)) + '/3-latex/images/'
 tensorboard_path = os.path.dirname(LOCAL) + '/tensorboard/'

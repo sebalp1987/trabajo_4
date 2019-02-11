@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plot
 import seaborn as sns
+from itertools import permutations
 
 from keras import Input, layers, regularizers, losses
 from keras.models import Model
@@ -11,8 +12,9 @@ from keras.utils import plot_model
 
 from sklearn.feature_selection import VarianceThreshold
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import (confusion_matrix, precision_recall_curve, recall_score, precision_score, fbeta_score)
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.metrics import (confusion_matrix, precision_recall_curve, recall_score, precision_score, fbeta_score,
+                             roc_curve, roc_auc_score)
 
 import STRING
 
@@ -141,7 +143,7 @@ if __name__ == '__main__':
     normalize = pd.concat([normal, anormal], axis=0)
     for i in normalize.drop(['oferta_id', 'target', 'CONTROL'], axis=1).columns.values.tolist():
         normalize[i] = normalize[i].map(float)
-        normalize[i] = StandardScaler().fit_transform(normalize[i].values.reshape(-1, 1))
+        normalize[i] = MinMaxScaler(feature_range=(-1, 1)).fit_transform(normalize[i].values.reshape(-1, 1))
 
     normal = normalize[normalize['CONTROL'] == 0]
     anormal = normalize[normalize['CONTROL'] == 1]
@@ -165,12 +167,13 @@ if __name__ == '__main__':
     # INPUT COLS
     cols = train.drop(['oferta_id', 'target'], axis=1).shape[1]
 
-    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.2, dimension_node=4, encoding_dim=14)
+    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.2, dimension_node=4, encoding_dim=14,
+                         final_activation='sigmoid')
     early_stopping_monitor = EarlyStopping(patience=2)
-    tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)
-    ae.fit(train.drop(['oferta_id', 'target'], axis=1), x_valid=[valid, valid], callback_list=[early_stopping_monitor, tensorboard],
-           batch_size=200, epochs=1000,
-           learning_rate=0.001)
+    # tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)
+    ae.fit(train.drop(['oferta_id', 'target'], axis=1), x_valid=[valid, valid], callback_list=[early_stopping_monitor],
+           batch_size=100, epochs=1000,
+           learning_rate=0.001, loss_function=losses.cosine_proximity)
 
     # After watching the plot where train and valid have to converge (the reconstruction error)
     # we look if it is enough low
@@ -196,14 +199,6 @@ if __name__ == '__main__':
     mse_anormal['target'] = pd.Series(1, index=mse_anormal.index)
     error_df = pd.concat([mse_test, mse_anormal], axis=0)
 
-    # We separate the values
-    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.5, random_state=42)
-    mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.5, random_state=42)
-    error_df_valid = pd.concat([mse_test_valid, mse_anormal_valid], axis=0).reset_index(drop=True)
-    error_df_test = pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
-    error_df_test['target'] = error_df_test['target'].map(int)
-    error_df_valid['target'] = error_df_valid['target'].map(int)
-
     # PLOT ERROR WITHOUT ANOMALIES
     fig = plot.figure()
     ax = fig.add_subplot(111)
@@ -223,7 +218,7 @@ if __name__ == '__main__':
     plot.close()
 
     # RECALL-PRECISION
-    precision, recall, th = precision_recall_curve(error_df_valid.target, error_df_valid.reconstruction_error)
+    precision, recall, th = precision_recall_curve(error_df.target, error_df.reconstruction_error)
     plot.plot(recall, precision, 'b', label='Precision-Recall curve')
     plot.title('Recall vs Precision')
     plot.xlabel('Recall')
@@ -236,59 +231,102 @@ if __name__ == '__main__':
     plot.title('Precision-Recall for different threshold values')
     plot.xlabel('Threshold')
     plot.ylabel('Precision-Recall')
-    plot.xlim(left=0, right=2)
     plot.legend(['precision', 'recall'], loc='upper right')
     plot.savefig(STRING.img_path + 'ae_figure_1.png')
     plot.show()
 
     # OUTLIER DETECTION
     # We define a threshold for the reconstruction error. It will be based on the error plot
+
+    # WE SEPARATE THE SAMPLES 50/50
+    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.5, random_state=42)
+    mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.5, random_state=42)
+    error_df_valid = pd.concat([mse_test_valid, mse_anormal_valid], axis=0).reset_index(drop=True)
+    error_df_test = pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
+    error_df_valid.to_csv(STRING.test_sample_1, sep=';', index=False)
+    error_df_test.to_csv(STRING.test_sample_2, sep=';', index=False)
+    error_df_test['target'] = error_df_test['target'].map(int)
+    error_df_valid['target'] = error_df_valid['target'].map(int)
+
+    # ITERATE THROUGH THE SAMPLES
     thresholds = np.linspace(0.001, 100.0, 10000)
+    i = 0
+    for error in permutations([error_df_valid, error_df_test], 2):
+        scores = []
+        i += 1
+        error_test = error[0]
+        error_valid = error[1]
 
-    scores = []
+        for threshold in thresholds:
+            y_hat = [1 if e > threshold else 0 for e in error_valid.reconstruction_error.values]
+            scores.append([
+                recall_score(y_pred=y_hat, y_true=error_valid.target.values),
+                precision_score(y_pred=y_hat, y_true=error_valid.target.values),
+                fbeta_score(y_pred=y_hat, y_true=error_valid.target.values,
+                            beta=1, average='binary')
+            ])
 
-    for threshold in thresholds:
-        y_hat = [1 if e > threshold else 0 for e in error_df_valid.reconstruction_error.values]
-        scores.append([
-            recall_score(y_pred=y_hat, y_true=error_df_valid.target.values),
-            precision_score(y_pred=y_hat, y_true=error_df_valid.target.values),
-            fbeta_score(y_pred=y_hat, y_true=error_df_valid.target.values,
-                        beta=1, average='binary')
-        ])
+        scores = np.array(scores)
+        threshold = thresholds[scores[:, 2].argmax()]
+        print('final Threshold ', threshold)
+        predicted = [1 if e > threshold else 0 for e in error_test.reconstruction_error.values]
 
-    scores = np.array(scores)
-    threshold = thresholds[scores[:, 2].argmax()]
-    print('final Threshold ', threshold)
-    predicted = [1 if e > threshold else 0 for e in error_df_test.reconstruction_error.values]
+        precision = precision_score(error_test.target.values, predicted)
+        recall = recall_score(error_test.target.values, predicted)
+        fbeta = fbeta_score(error_test.target.values, predicted, beta=1)
+        print('PRECISION ', precision)
+        print('RECALL ', recall)
+        print('FBSCORE ', fbeta)
 
-    precision = precision_score(error_df_test.target.values, predicted)
-    recall = recall_score(error_df_test.target.values, predicted)
-    fbeta = fbeta_score(error_df_test.target.values, predicted, beta=1)
-    print('PRECISION ', precision)
-    print('RECALL ', recall)
-    print('FBSCORE ', fbeta)
+        # Reconstruction Error plot
+        groups = error_df.groupby('target')
+        fig, ax = plot.subplots()
+        for name, group in groups:
+            ax.plot(group.index, group.reconstruction_error, marker='o', ms=3.5, linestyle='',
+                    label="Anomaly" if name == 1 else "Normal")
+        ax.hlines(threshold, ax.get_xlim()[0], ax.get_xlim()[1], colors="r", zorder=100, label='Threshold')
+        ax.legend()
+        plot.title("Reconstruction error for different classes")
+        plot.ylabel("Reconstruction error")
+        plot.xlabel("Data point index")
+        plot.savefig(STRING.img_path + 'ae_final_result_sample_' + str(i) + '.png')
+        plot.show()
 
-    # Reconstruction Error plot
-    groups = error_df.groupby('target')
-    fig, ax = plot.subplots()
-    for name, group in groups:
-        ax.plot(group.index, group.reconstruction_error, marker='o', ms=3.5, linestyle='',
-                label="Anomaly" if name == 1 else "Normal")
-    ax.hlines(threshold, ax.get_xlim()[0], ax.get_xlim()[1], colors="r", zorder=100, label='Threshold')
-    ax.legend()
-    plot.title("Reconstruction error for different classes")
-    plot.ylabel("Reconstruction error")
-    plot.xlabel("Data point index")
-    plot.savefig(STRING.img_path + 'ae_final_result.png')
-    plot.show()
+        # Confussion Matrix
+        conf_matrix = confusion_matrix(error_test.target, predicted)
+        plot.figure(figsize=(12, 12))
+        sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True,
+                    fmt="d", cmap="Blues", cbar=False)
+        plot.title("Confusion matrix")
+        plot.ylabel('True class')
+        plot.xlabel('Predicted class')
+        plot.savefig(STRING.img_path + 'ae_confussion_matrix_sample_' + str(i) + '.png')
+        plot.show()
 
-    # Confussion Matrix
-    conf_matrix = confusion_matrix(error_df_test.target, predicted)
-    plot.figure(figsize=(12, 12))
-    sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True,
-                fmt="d", cmap="Blues", cbar=False)
-    plot.title("Confusion matrix")
-    plot.ylabel('True class')
-    plot.xlabel('Predicted class')
-    plot.savefig(STRING.img_path + 'ae_confussion_matrix.png')
-    plot.show()
+        # ROC CURVE
+        auc = roc_auc_score(error_test.target.values, error_test.reconstruction_error.values)
+        print('AUC: %.3f' % auc)
+
+        # calculate roc curve
+        fpr, tpr, thresholds = roc_curve(error_test.target.values, error_test.reconstruction_error.values,
+                                         drop_intermediate=False)
+        # plot no skill
+        plot.plot([0, 1], [0, 1], linestyle='--')
+        # plot the roc curve for the model
+        plot.plot(fpr, tpr, marker='.')
+        # show the plot
+        plot.savefig(STRING.img_path + 'ae_roc_curve_sample_' + str(i) + '.png')
+        plot.show()
+
+        metric_save = [['ae', i, threshold, precision, recall, fbeta, fpr.tolist(), tpr.tolist(), auc]]
+        metric_save = pd.DataFrame(metric_save,
+                                   columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore',
+                                            'fpr', 'tpr', 'auc'])
+        try:
+            df = pd.read_csv(STRING.metric_save, sep=';')
+        except FileNotFoundError:
+            df = pd.DataFrame(
+                columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore', 'fpr', 'tpr', 'auc'])
+
+        df = pd.concat([df, metric_save], axis=0)
+        df.to_csv(STRING.metric_save, sep=';', index=False)

@@ -86,12 +86,12 @@ class ResidualConnection(object):
         target = to_categorical(target)
         if validation_data is not None:
             validation_data[1] = to_categorical(validation_data[1].target)
-        tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)
+        # tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)
         callback_list = EarlyStopping(patience=2)
         optimizer = Adam(lr=learning_rate)
         self.model.compile(optimizer=optimizer, loss=loss_function, metrics=['accuracy'])
         self.model.fit(x=predictors, y=target, epochs=epochs, batch_size=batch_size, validation_data=validation_data,
-                       callbacks=[callback_list, tensorboard], verbose=verbose, class_weight=class_weight,
+                       callbacks=[callback_list], verbose=verbose, class_weight=class_weight,
                        validation_split=validation_split)
 
     def predict_model(self, x_test):
