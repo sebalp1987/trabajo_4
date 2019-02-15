@@ -5,10 +5,11 @@ from keras.optimizers import SGD, Adam
 from keras.callbacks import EarlyStopping, TensorBoard
 import STRING
 
+
 class NeuralNetwork(object):
 
     def __init__(self, n_cols, node_size=[100],
-                 prob_dropout=None, sparsity_const=10e-5, activation='relu', beta=1):
+                 prob_dropout=None, sparsity_const=10e-4, activation='relu'):
         """
         :param n_cols: Number of Predictors
         :param node_size: Node Size (but also the len(node_size) determines the number of layers)
@@ -22,7 +23,6 @@ class NeuralNetwork(object):
         self.prob_dropout = prob_dropout
         self.node_size = node_size
         self.sparsity_const = sparsity_const
-        self.beta = beta
 
         input_layer = Input(shape=(n_cols,))
 
@@ -31,14 +31,14 @@ class NeuralNetwork(object):
         for node in node_size:
             if sparsity_const is not None:
                 x = layers.Dense(node, activation=self.activation,
-                                 activity_regularizer=regularizers.l1(sparsity_const))(x)
+                                 activity_regularizer=regularizers.l1_l2(sparsity_const, sparsity_const))(x)
             else:
                 x = layers.Dense(node, activation=self.activation)(x)
 
             if self.prob_dropout is not None:
                 x = layers.Dropout(self.prob_dropout)(x)
 
-        output_tensor = layers.Dense(2, activation='softmax')(x)
+        output_tensor = layers.Dense(2, activation='sigmoid')(x)
 
         self.model = Model(input_layer, output_tensor)
         plot_model(self.model, to_file=STRING.img_path + 'nn_architecture.png', show_shapes=True)

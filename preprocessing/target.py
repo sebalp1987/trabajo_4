@@ -76,10 +76,11 @@ keep_var = ['oferta_id', 'oferta_tomador_sexo', 'oferta_tom_cond', 'oferta_propi
             'd_uso_publico',
             'd_tipo_car', 'd_tipo_motorbike', 'd_tipo_van-track', 'd_tipo_autocar', 'd_tipo_agricola',
             'd_tipo_industrial',
-            'vehiculo_heavy', 'oferta_sim_cia_actual', 'oferta_sim_siniestro_5_anio_culpa',
+            'vehiculo_heavy','oferta_sim_siniestro_5_anio_culpa',
             'oferta_sim_anios_asegurado', 'oferta_sim_antiguedad_cia_actual', 'oferta_sim_siniestro_1_anio_culpa',
             'oferta_bonus_simulacion_perc', 'oferta_veh_valor_unitary', 'cliente_edad_18_30', 'cliente_edad_30_65',
-            'cliente_edad_65', 'antiguedad_vehiculo', 'oferta_adicional_riesgo',  'oferta_veh_plazas', 'oferta_veh_potencia', 'oferta_veh_cilindrada',
+            'cliente_edad_65', 'antiguedad_vehiculo', 'oferta_adicional_riesgo',  'oferta_veh_plazas',
+            'oferta_veh_potencia', 'oferta_veh_cilindrada',
             'cliente_region_AFRICAARABE', 'cliente_region_AFRICASUBSHARIANA', 'cliente_region_AMERICADELSUR',
             'cliente_region_ASIAORIENTAL', 'cliente_region_EUROPACENTRAL', 'cliente_region_EUROPADELNORTE',
             'cliente_region_EUROPADELSUR', 'cliente_region_EUROPAOCCIDENTAL', 'cliente_region_EUROPAORIENTAL',
@@ -89,7 +90,7 @@ keep_var = ['oferta_id', 'oferta_tomador_sexo', 'oferta_tom_cond', 'oferta_propi
 
 extras = ['oferta_veh_marca',
             'oferta_veh_modelo', 'oferta_veh_version', 'oferta_veh_accesorio', 'oferta_veh_tipo',
-            'oferta_veh_grupo_tarifa']
+            'oferta_veh_grupo_tarifa',  'oferta_sim_cia_actual']
 df = df[keep_var]
 print(df.shape)
 putils.output_normal_anormal_new(df)

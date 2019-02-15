@@ -8,7 +8,7 @@ import STRING
 
 class ResidualConnection(object):
     def __init__(self, n_cols, number_layers=6, node_size=100,
-                 prob_dropout=0.1, sparsity_const=10e-5, activation='relu', different_size=None,
+                 prob_dropout=0.1, sparsity_const=10e-4, activation='relu', different_size=None,
                  beta=1, nodes_range='auto'):
         """
         :param n_cols: Number of columns of the dataset
@@ -38,7 +38,7 @@ class ResidualConnection(object):
         if sparsity_const is not None:
             residual = layers.Dense(node_size, activation=self.activation, name='residual_layer_' + str(node_size),
                                     activity_regularizer=
-                                    regularizers.l1(sparsity_const))(input_layer)
+                                    regularizers.l1_l2(sparsity_const, sparsity_const))(input_layer)
         else:
             residual = layers.Dense(node_size, activation=self.activation, name='root_layer_' + str(node_size))(
                 input_layer)
@@ -52,7 +52,7 @@ class ResidualConnection(object):
                 print(nodes)
                 if sparsity_const is not None:
                     y = layers.Dense(node_size, activation=self.activation, activity_regularizer=
-                    regularizers.l1(sparsity_const))(y)
+                    regularizers.l1_l2(sparsity_const, sparsity_const))(y)
                 else:
                     y = layers.Dense(node_size, activation=self.activation)(y)
                 if self.prob_dropout is not None:
@@ -64,7 +64,7 @@ class ResidualConnection(object):
                     y = residual
                     y = layers.Dense(nodes, activation=self.activation, name='root_layer_' + str(nodes),
                                      activity_regularizer=
-                                     regularizers.l1(sparsity_const))(y)
+                                     regularizers.l1_l2(sparsity_const, sparsity_const))(y)
                 else:
                     y = layers.Dense(nodes + different_size, activation=self.activation,
                                      name='root_layer_' + str(nodes))(y)

@@ -8,7 +8,7 @@ from keras import Input, layers, backend as K, objectives
 from keras.models import Model
 from keras.optimizers import SGD, Adam
 from keras.callbacks import EarlyStopping, TensorBoard
-from keras.utils import plot_model
+from keras.utils import plot_model, to_categorical
 
 from model.ae import DeepAutoencoder
 import STRING
@@ -18,7 +18,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import (confusion_matrix, precision_recall_curve, recall_score, precision_score, fbeta_score,
                              roc_auc_score, roc_curve)
-
 
 sns.set()
 latent_dim = 2
@@ -48,7 +47,7 @@ class VariationalAutoencoder(object):
         z_mean, z_logsigma = args
         print('z_mean', z_mean)
         print('logsig', z_logsigma)
-        reconstruction_loss = objectives.cosine_proximity(x, x_decoded_mean)
+        reconstruction_loss = objectives.mean_squared_error(x, x_decoded_mean)
         latent_loss = -0.50 * K.mean(1 + z_logsigma - K.square(z_mean) - K.exp(z_logsigma), axis=-1)
         print('RL ', reconstruction_loss)
         print('LL ', latent_loss)
@@ -94,21 +93,22 @@ if __name__ == '__main__':
     predicted_index = np.empty(shape=[0, ])
     # We divide the normal and the abnormal dataset
     train, valid, _, _ = train_test_split(normal, normal, test_size=0.30, random_state=42)
-    valid, test_normal, _, _ = train_test_split(valid, valid, test_size=len(anormal.index), random_state=42)
+    valid, test_normal, _, _ = train_test_split(valid, valid, test_size=len(anormal.index), random_state=10)
     valid = valid.drop(['oferta_id', 'target'], axis=1)
     print(train.shape)
     print(valid.shape)
     print(test_normal.shape)
+
     # INPUT COLS
     cols = train.drop(['oferta_id', 'target'], axis=1).shape[1]
     input = Input(shape=(cols,))
     x = layers.Dense(cols, activation='tanh')(input)
-    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.2, dimension_node=6, encoding_dim=6,
+    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.3, dimension_node=3, encoding_dim=16,
                          final_activation='tanh')
     vae = VariationalAutoencoder(batch_size=100, latent_dim=latent_dim)
     encoded, intermediate_dim = ae.encoded(input, change_encode_name='Encoder')
     print('First_Layer', encoded)
-
+    
     # We generate z_mean and sigma from the encoded distribution
     z_mean = layers.Dense(latent_dim, name='z_mean')(encoded)
     z_log_var = layers.Dense(latent_dim, name='z_var')(encoded)
@@ -122,9 +122,9 @@ if __name__ == '__main__':
     print(decode_z)
 
     # If you want to add more (OPTIONAL)
-    decode_z = layers.Dense(int(cols * 1 / 4), activation='tanh', name='decode_Z_1')(decode_z)
-    decode_z = layers.Dense(int(cols * 2 / 4), activation='tanh', name='decode_Z_2')(decode_z)
-    decode_z = layers.Dense(int(cols * 3 / 4), activation='tanh', name='decode_Z_3')(decode_z)
+    # decode_z = layers.Dense(int(cols * 1 / 4), activation='tanh', name='decode_Z_1')(decode_z)
+    decode_z = layers.Dense(32, activation='tanh', name='decode_Z_2')(decode_z)
+    # decode_z = layers.Dense(int(cols * 3 / 4), activation='tanh', name='decode_Z_3')(decode_z)
 
     # We decode X from Z
     decode_x = layers.Dense(cols, activation='sigmoid', name='decode_xZ')(decode_z)
@@ -214,7 +214,6 @@ if __name__ == '__main__':
     # OUTLIER DETECTION
     # We define a threshold for the reconstruction error. It will be based on the error plot
 
-
     # WE SEPARATE THE SAMPLES 50/50
     mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.5, random_state=42)
     mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.5, random_state=42)
@@ -228,6 +227,8 @@ if __name__ == '__main__':
     # ITERATE THROUGH THE SAMPLES
     thresholds = np.linspace(0.001, 100.0, 10000)
     i = 0
+    metric_save = []
+
     for error in permutations([error_df_valid, error_df_test], 2):
         scores = []
         i += 1
@@ -256,6 +257,7 @@ if __name__ == '__main__':
         print('FBSCORE ', fbeta)
 
         # Reconstruction Error plot
+        error_df = error_df.reset_index(drop=True)
         groups = error_df.groupby('target')
         fig, ax = plot.subplots()
         for name, group in groups:
@@ -317,19 +319,20 @@ if __name__ == '__main__':
         plot.savefig(STRING.img_path + 'roc_curve_sample_' + str(i) + '.png')
         plot.show()
 
-        metric_save = [['vae', i, threshold, precision, recall, fbeta, fpr.tolist(), tpr.tolist(), auc]]
-        metric_save = pd.DataFrame(metric_save,
-                                   columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore',
-                                            'fpr', 'tpr', 'auc'])
-        print(metric_save['fpr'])
-        try:
-            df = pd.read_csv(STRING.metric_save, sep=';')
-        except FileNotFoundError:
-            df = pd.DataFrame(
-                columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore', 'fpr', 'tpr', 'auc'])
+        metric_save_i = ['vae', i, threshold, precision, recall, fbeta, fpr.tolist(), tpr.tolist(), auc]
+        metric_save.append(metric_save_i)
+    metric_save = pd.DataFrame(metric_save,
+                               columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore',
+                                        'fpr', 'tpr', 'auc'])
+    try:
+        df = pd.read_csv(STRING.metric_save, sep=';')
+    except FileNotFoundError:
+        df = pd.DataFrame(
+            columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore', 'fpr', 'tpr', 'auc'])
 
-        df = pd.concat([df, metric_save], axis=0)
-        df.to_csv(STRING.metric_save, sep=';', index=False)
+    df = pd.concat([df, metric_save], axis=0)
+    df = df.drop_duplicates(subset=['model', 'sample'], keep='last')
+    df.to_csv(STRING.metric_save, sep=';', index=False)
 
 
 

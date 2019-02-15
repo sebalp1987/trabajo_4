@@ -34,7 +34,7 @@ test_sample_2 = test_sample_2[['oferta_id', 'target']]
 test_sample_1 = test[test['oferta_id'].isin(test_sample_1['oferta_id'].values.tolist())]
 test_sample_2 = test[test['oferta_id'].isin(test_sample_2['oferta_id'].values.tolist())]
 
-traininig_sample = test[-test['oferta_id'].isin(test_sample_1['oferta_id'].values.tolist() + 
+traininig_sample = test[-test['oferta_id'].isin(test_sample_1['oferta_id'].values.tolist() +
                                                 test_sample_2['oferta_id'].values.tolist())]
 
 # We split to half to have the same proportion of anomalies to train: 50%TOTAL1/AN1, 50%TOTAL2/AN2
@@ -61,7 +61,6 @@ x_test_sample_2 = test_sample_2.drop([label] + ['oferta_id'], axis=1)
 y_test_sample_1 = test_sample_1[[label]]
 y_test_sample_2 = test_sample_2[[label]]
 
-
 # Parameters
 sns.set()
 tresholds = np.linspace(0.1, 1.0, 200)
@@ -69,8 +68,14 @@ scores = []
 sampling = None
 seed = 42
 np.random.seed(seed)
-model = 'rc'
-
+learning_rate = 0.001
+epochs = 500
+batch_size = 100
+prob_dropout = 0.3
+activation = 'relu'
+model = 'nn'
+node_size = 48
+loss_function = 'binary_crossentropy'
 
 # Variance Reduction
 selection = VarianceThreshold(threshold=0.0)
@@ -97,14 +102,14 @@ cols = x.shape[1]
 fileNames = np.array(x.columns.values)
 
 # Models
-models = {'ert': ExtraTreesClassifier(n_estimators=500, max_depth=20, bootstrap=True, oob_score=True,
-                                      class_weight='balanced_subsample', max_features='auto', random_state=42),
-          'nn': NeuralNetwork(n_cols=cols, node_size=[100, 100], activation='relu', prob_dropout=0.2),
-          'rc': ResidualConnection(n_cols=cols, activation='relu', prob_dropout=0.2,
-                                   number_layers=10, node_size=32, nodes_range=range(1000, 100, -100)),
-          'ic': InceptionModel(n_cols=cols, activation='relu', node_size=32, branch_number=6,
-                               prob_dropout=0.2)
-
+models = {'ert': ExtraTreesClassifier(n_estimators=1000, max_depth=None, bootstrap=False, oob_score=False,
+                                      class_weight='balanced_subsample', max_features='sqrt', random_state=42),
+          'nn': NeuralNetwork(n_cols=cols, node_size=[node_size, node_size], activation=activation,
+                              prob_dropout=prob_dropout),
+          'rc': ResidualConnection(n_cols=cols, activation=activation, prob_dropout=prob_dropout,
+                                   number_layers=5, node_size=node_size, nodes_range=[48, 48]),
+          'ic': InceptionModel(n_cols=cols, activation=activation, node_size=48, branch_number=3,
+                               prob_dropout=prob_dropout)
           }
 
 fileModel = models.get(model)
@@ -129,16 +134,16 @@ for train_index, test_index in skf.split(x.values, y[label].values):
         class_weight = None
 
     try:
-        min_sample_leaf = round(y_train.shape[0] * 0.01)
+        min_sample_leaf = round(y_train.shape[0] * 0.025)
         min_sample_split = min_sample_leaf * 10
         fileModel.min_samples_leaf = min_sample_leaf
         fileModel.min_samples_split = min_sample_split
         fileModel.fit(x_train, y_train)
         y_pred_score_i = fileModel.predict_proba(x_test)
     except:
-        fileModel.fit_model(x_train, y_train, learning_rate=0.001, loss_function='mean_squared_error',
-                            epochs=500,
-                            batch_size=5000, verbose=True, validation_data=None, validation_split=0.2)
+        fileModel.fit_model(x_train, y_train, learning_rate=learning_rate, loss_function=loss_function,
+                            epochs=epochs,
+                            batch_size=batch_size, verbose=False, validation_data=None, validation_split=0.2)
         y_pred_score_i = fileModel.predict_model(x_test)
 
     y_pred_score = np.append(y_pred_score, y_pred_score_i, axis=0)
@@ -195,36 +200,41 @@ plot.show()
 
 # FINAL TEST
 i = 0
+metric_save = []
 fileModel = models.get(model)
-for sample in [[x_train_sample_1, y_train_sample_1, x_test_sample_1, y_test_sample_1],
-                            [x_train_sample_2, y_train_sample_2, x_test_sample_2, y_test_sample_2]]:
+for sample in [[x_train_sample_2, y_train_sample_2, x_test_sample_2, y_test_sample_2],
+               [x_train_sample_1, y_train_sample_1, x_test_sample_1, y_test_sample_1]]:
     i += 1
     x = sample[0]
     y = sample[1]
+    print(y.sum() / y.count())
     x_final_test = sample[2]
     y_final_test = sample[3]
+    x, x_valid, y, y_valid = train_test_split(x, y, test_size=0.15, random_state=42, shuffle=True, stratify=y)
 
     try:
-        min_sample_leaf = round(y.shape[0] * 0.01)
-        print(min_sample_leaf)
+        min_sample_leaf = round(y.shape[0] * 0.06)
         min_sample_split = min_sample_leaf * 10
         fileModel.min_samples_leaf = min_sample_leaf
         fileModel.min_samples_split = min_sample_split
         fileModel.fit(x, y)
+        y_pred_score_valid = fileModel.predict_proba(x_valid)
         y_pred_score = fileModel.predict_proba(x_final_test)
     except:
-        fileModel.fit_model(x, y, learning_rate=0.001, loss_function='mean_squared_error',
-                            epochs=500,
-                            batch_size=2500, verbose=True, validation_data=None, validation_split=0.2)
+        fileModel.fit_model(x, y, learning_rate=learning_rate, loss_function=loss_function,
+                            epochs=epochs,
+                            batch_size=batch_size, verbose=True, validation_data=[x_valid, y_valid]
+                            )
+        y_pred_score_valid = fileModel.predict_model(x_valid)
         y_pred_score = fileModel.predict_model(x_final_test)
 
     scores = []
 
     for treshold in tresholds:
-        y_hat = (y_pred_score[:, 1] > treshold).astype(int)
-        scores.append([recall_score(y_pred=y_hat, y_true=y_final_test.values),
-                       precision_score(y_pred=y_hat, y_true=y_final_test.values),
-                       fbeta_score(y_pred=y_hat, y_true=y_final_test.values,
+        y_hat = (y_pred_score_valid[:, 1] > treshold).astype(int)
+        scores.append([recall_score(y_pred=y_hat, y_true=y_valid.values),
+                       precision_score(y_pred=y_hat, y_true=y_valid.values),
+                       fbeta_score(y_pred=y_hat, y_true=y_valid.values,
                                    beta=1)])
 
     scores = np.array(scores)
@@ -261,19 +271,38 @@ for sample in [[x_train_sample_1, y_train_sample_1, x_test_sample_1, y_test_samp
     # plot the roc curve for the model
     plot.plot(fpr, tpr, marker='.')
     # show the plot
-    plot.savefig(STRING.img_path +  model + '_roc_curve_sample_' + str(i) + '.png')
+    plot.savefig(STRING.img_path + model + '_roc_curve_sample_' + str(i) + '.png')
     plot.show()
+    metric_save_i = [model, i,final_tresh , precision, recall, fbeta, fpr.tolist(), tpr.tolist(), auc]
+    metric_save.append(metric_save_i)
 
-    metric_save = [[model, i, final_tresh, precision, recall, fbeta, fpr.tolist(), tpr.tolist(), auc]]
-    metric_save = pd.DataFrame(metric_save,
-                               columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore',
-                                        'fpr', 'tpr', 'auc'])
-    try:
-        df = pd.read_csv(STRING.metric_save, sep=';')
-    except FileNotFoundError:
-        df = pd.DataFrame(
-            columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore', 'fpr', 'tpr', 'auc'])
+metric_save = pd.DataFrame(metric_save,
+                           columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore',
+                                    'fpr', 'tpr', 'auc'])
+try:
+    df = pd.read_csv(STRING.metric_save, sep=';')
+except FileNotFoundError:
+    df = pd.DataFrame(
+        columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore', 'fpr', 'tpr', 'auc'])
 
-    df = pd.concat([df, metric_save], axis=0)
-    df.to_csv(STRING.metric_save, sep=';', index=False)
+df = pd.concat([df, metric_save], axis=0)
+df = df.drop_duplicates(subset=['model', 'sample'], keep='last')
+df.to_csv(STRING.metric_save, sep=';', index=False)
 
+'''
+names = x.columns.values
+fileNames = np.array(names)
+featureImportance = fileModel.feature_importances_
+featureImportance = featureImportance / featureImportance.max()
+sorted_idx = np.argsort(featureImportance)
+fi = featureImportance[sorted_idx]
+fi = fi[-10:]
+barPos = np.arange(sorted_idx.shape[0]) + 0.5
+barPos = barPos[-10:]
+plot.barh(barPos, fi, align='center')
+fileNames = fileNames[sorted_idx]
+fileNames = fileNames[-10:]
+plot.yticks(barPos, fileNames)
+plot.xlabel('Variable Importance')
+plot.show()
+'''

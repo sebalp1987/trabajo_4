@@ -36,7 +36,7 @@ class DeepAutoencoder(object):
         self.encoding_dim = encoding_dim
         self.final_activation = final_activation
 
-    def encoded(self, input_layer, sparsity_const=10e-5, change_encode_name=None):
+    def encoded(self, input_layer, sparsity_const=10e-4, change_encode_name=None):
         """
         Generate the encode layers
         :param input_layer: The input layer
@@ -66,7 +66,7 @@ class DeepAutoencoder(object):
 
             if sparsity_const is not None:
                 input_layer = layers.Dense(last_node, activation=last_activation, name=layer_name, activity_regularizer=
-                                           regularizers.l1(sparsity_const))(input_layer)
+                                           regularizers.l1_l2(sparsity_const, sparsity_const))(input_layer)
             else:
                 input_layer = layers.Dense(last_node, activation=last_activation, name=layer_name)(input_layer)
             if self.prob_dropout is not None:
@@ -161,19 +161,19 @@ if __name__ == '__main__':
     test_anormal = anormal[features]
 
     train, valid, _, _ = train_test_split(normal, normal, test_size=0.30, random_state=42)
-    valid, test_normal, _, _ = train_test_split(valid, valid, test_size=len(anormal.index), random_state=42)
+    valid, test_normal, _, _ = train_test_split(valid, valid, test_size=len(anormal.index), random_state=10)
     valid = valid.drop(['oferta_id', 'target'], axis=1)
 
     # INPUT COLS
     cols = train.drop(['oferta_id', 'target'], axis=1).shape[1]
 
-    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.2, dimension_node=4, encoding_dim=14,
+    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.3, dimension_node=3, encoding_dim=16,
                          final_activation='sigmoid')
     early_stopping_monitor = EarlyStopping(patience=2)
     # tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)
     ae.fit(train.drop(['oferta_id', 'target'], axis=1), x_valid=[valid, valid], callback_list=[early_stopping_monitor],
            batch_size=100, epochs=1000,
-           learning_rate=0.001, loss_function=losses.cosine_proximity)
+           learning_rate=0.001, loss_function=losses.mean_squared_error)
 
     # After watching the plot where train and valid have to converge (the reconstruction error)
     # we look if it is enough low
@@ -243,14 +243,13 @@ if __name__ == '__main__':
     mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.5, random_state=42)
     error_df_valid = pd.concat([mse_test_valid, mse_anormal_valid], axis=0).reset_index(drop=True)
     error_df_test = pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
-    error_df_valid.to_csv(STRING.test_sample_1, sep=';', index=False)
-    error_df_test.to_csv(STRING.test_sample_2, sep=';', index=False)
     error_df_test['target'] = error_df_test['target'].map(int)
     error_df_valid['target'] = error_df_valid['target'].map(int)
 
     # ITERATE THROUGH THE SAMPLES
     thresholds = np.linspace(0.001, 100.0, 10000)
     i = 0
+    metric_save=[]
     for error in permutations([error_df_valid, error_df_test], 2):
         scores = []
         i += 1
@@ -279,6 +278,7 @@ if __name__ == '__main__':
         print('FBSCORE ', fbeta)
 
         # Reconstruction Error plot
+        error_df = error_df.reset_index(drop=True)
         groups = error_df.groupby('target')
         fig, ax = plot.subplots()
         for name, group in groups:
@@ -318,15 +318,17 @@ if __name__ == '__main__':
         plot.savefig(STRING.img_path + 'ae_roc_curve_sample_' + str(i) + '.png')
         plot.show()
 
-        metric_save = [['ae', i, threshold, precision, recall, fbeta, fpr.tolist(), tpr.tolist(), auc]]
-        metric_save = pd.DataFrame(metric_save,
-                                   columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore',
-                                            'fpr', 'tpr', 'auc'])
-        try:
-            df = pd.read_csv(STRING.metric_save, sep=';')
-        except FileNotFoundError:
-            df = pd.DataFrame(
-                columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore', 'fpr', 'tpr', 'auc'])
+        metric_save_i = ['ae', i, threshold, precision, recall, fbeta, fpr.tolist(), tpr.tolist(), auc]
+        metric_save.append(metric_save_i)
+    metric_save = pd.DataFrame(metric_save,
+                               columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore',
+                                        'fpr', 'tpr', 'auc'])
+    try:
+        df = pd.read_csv(STRING.metric_save, sep=';')
+    except FileNotFoundError:
+        df = pd.DataFrame(
+            columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore', 'fpr', 'tpr', 'auc'])
 
-        df = pd.concat([df, metric_save], axis=0)
-        df.to_csv(STRING.metric_save, sep=';', index=False)
+    df = pd.concat([df, metric_save], axis=0)
+    df = df.drop_duplicates(subset=['model', 'sample'], keep='last')
+    df.to_csv(STRING.metric_save, sep=';', index=False)

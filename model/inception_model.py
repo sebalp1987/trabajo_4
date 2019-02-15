@@ -7,7 +7,7 @@ import STRING
 
 class InceptionModel(object):
     def __init__(self, n_cols, node_size=100, branch_number=4,
-                 prob_dropout=0.1, sparsity_const=10e-5, activation='relu', beta=1):
+                 prob_dropout=0.1, sparsity_const=10e-4, activation='relu'):
 
         self.n_cols = n_cols
         self.node_size = node_size
@@ -15,7 +15,6 @@ class InceptionModel(object):
         self.activation = activation
         self.prob_dropout = prob_dropout
         self.sparsity_const = sparsity_const
-        self.beta = beta
 
         input_layer = Input(shape=(n_cols,))
 
@@ -24,10 +23,10 @@ class InceptionModel(object):
         for branch in range(0, branch_number + 1, 1):
             if sparsity_const is not None:
                 branch_i = layers.Dense(node_size, activation=self.activation, activity_regularizer=
-                regularizers.l1(sparsity_const))(x)
+                regularizers.l1_l2(sparsity_const, sparsity_const))(x)
             else:
                 branch_i = layers.Dense(node_size, activation=self.activation, activity_regularizer=
-                regularizers.l1(l1=sparsity_const))(x)
+                regularizers.l1_l2(sparsity_const, sparsity_const))(x)
             if self.prob_dropout is not None:
                 branch_i = layers.Dropout(self.prob_dropout)(branch_i)
 

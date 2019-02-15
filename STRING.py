@@ -43,7 +43,6 @@ metric_save = path_db_extra + 'metric_save.csv'
 
 img_path = os.path.dirname(os.path.dirname(LOCAL)) + '/3-latex/images/'
 tensorboard_path = os.path.dirname(LOCAL) + '/tensorboard/'
-print(tensorboard_path)
 
 # PARAMETERS
 configure_names = {'cliente_numero_siniestros_auto': 'Sum of vehicle claims per year',
