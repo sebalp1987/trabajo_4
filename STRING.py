@@ -38,6 +38,8 @@ test = path_training + 'test.csv'
 
 test_sample_1 = path_training + 'test_sample1.csv'
 test_sample_2 = path_training + 'test_sample2.csv'
+test_sample_1_normalize = path_training + 'test_sample1_normal.csv'
+test_sample_2_normalize = path_training + 'test_sample2_normal.csv'
 
 metric_save = path_db_extra + 'metric_save.csv'
 

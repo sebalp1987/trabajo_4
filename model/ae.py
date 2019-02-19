@@ -36,7 +36,7 @@ class DeepAutoencoder(object):
         self.encoding_dim = encoding_dim
         self.final_activation = final_activation
 
-    def encoded(self, input_layer, sparsity_const=10e-4, change_encode_name=None):
+    def encoded(self, input_layer, sparsity_const=10e-3, change_encode_name=None):
         """
         Generate the encode layers
         :param input_layer: The input layer
@@ -116,13 +116,13 @@ class DeepAutoencoder(object):
         return autoencoder
 
     def fit(self, x, x_valid, learning_rate=0.001, loss_function=losses.mean_squared_error, epochs=500,
-            batch_size=500, verbose=True, callback_list=[]):
+            batch_size=500, verbose=True, callback_list=[], steps_per_epoch=None, validation_steps=None):
         input_tensor = Input(shape=(self.n_cols,), name='Input')
         autoencoder = DeepAutoencoder.autoencoder(self, input_tensor)
         optimizer = Adam(lr=learning_rate)
         autoencoder.compile(optimizer=optimizer, loss=loss_function)
         history = autoencoder.fit(x, x, epochs=epochs, batch_size=batch_size, verbose=verbose, callbacks=callback_list,
-                                  shuffle=True, validation_data=x_valid).history
+                                  shuffle=True, validation_data=x_valid, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps).history
 
 
 if __name__ == '__main__':
@@ -155,7 +155,7 @@ if __name__ == '__main__':
     selection = VarianceThreshold(threshold=0.0)
     selection.fit(normal.drop(['oferta_id', 'target'], axis=1))
     features = selection.get_support(indices=True)
-    features = list(normal.columns[features]) + ['oferta_id', 'target']
+    features = list(normal.columns[features]) + ['target']
 
     normal = normal[features]
     test_anormal = anormal[features]
@@ -167,12 +167,12 @@ if __name__ == '__main__':
     # INPUT COLS
     cols = train.drop(['oferta_id', 'target'], axis=1).shape[1]
 
-    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.3, dimension_node=3, encoding_dim=16,
+    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.4, dimension_node=3, encoding_dim=16,
                          final_activation='sigmoid')
     early_stopping_monitor = EarlyStopping(patience=2)
     # tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)
     ae.fit(train.drop(['oferta_id', 'target'], axis=1), x_valid=[valid, valid], callback_list=[early_stopping_monitor],
-           batch_size=100, epochs=1000,
+           batch_size=None, epochs=1000, steps_per_epoch=15, validation_steps=10,
            learning_rate=0.001, loss_function=losses.mean_squared_error)
 
     # After watching the plot where train and valid have to converge (the reconstruction error)
@@ -239,7 +239,7 @@ if __name__ == '__main__':
     # We define a threshold for the reconstruction error. It will be based on the error plot
 
     # WE SEPARATE THE SAMPLES 50/50
-    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.5, random_state=42)
+    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.5, random_state=10)
     mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.5, random_state=42)
     error_df_valid = pd.concat([mse_test_valid, mse_anormal_valid], axis=0).reset_index(drop=True)
     error_df_test = pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     error_df_valid['target'] = error_df_valid['target'].map(int)
 
     # ITERATE THROUGH THE SAMPLES
-    thresholds = np.linspace(0.001, 100.0, 10000)
+    thresholds = np.linspace(0.001, 2.0, 10000)
     i = 0
     metric_save=[]
     for error in permutations([error_df_valid, error_df_test], 2):
@@ -303,31 +303,33 @@ if __name__ == '__main__':
         plot.savefig(STRING.img_path + 'ae_confussion_matrix_sample_' + str(i) + '.png')
         plot.show()
 
-        # ROC CURVE
-        auc = roc_auc_score(error_test.target.values, error_test.reconstruction_error.values)
-        print('AUC: %.3f' % auc)
-
-        # calculate roc curve
-        fpr, tpr, thresholds = roc_curve(error_test.target.values, error_test.reconstruction_error.values,
-                                         drop_intermediate=False)
-        # plot no skill
-        plot.plot([0, 1], [0, 1], linestyle='--')
-        # plot the roc curve for the model
-        plot.plot(fpr, tpr, marker='.')
-        # show the plot
-        plot.savefig(STRING.img_path + 'ae_roc_curve_sample_' + str(i) + '.png')
-        plot.show()
-
-        metric_save_i = ['ae', i, threshold, precision, recall, fbeta, fpr.tolist(), tpr.tolist(), auc]
+        metric_save_i = ['ae', i, threshold, precision, recall, fbeta]
         metric_save.append(metric_save_i)
+
+        # PROBABILITY FILE
+        try:
+            df_prob = pd.read_csv(STRING.path_db_extra + 'probability_save_' + str(i) + '.csv', sep=';')
+            del df_prob['ae']
+            df_prob['oferta_id'] = df_prob['oferta_id'].map(int)
+            error_test['oferta_id'] = error_test['oferta_id'].map(int)
+            df_prob = pd.merge(df_prob, error_test[['oferta_id', 'reconstruction_error']], how='left', on='oferta_id')
+            df_prob = df_prob.rename(columns={'reconstruction_error': 'ae'})
+            df_prob.to_csv(STRING.path_db_extra + 'probability_save_' + str(i) + '.csv', sep=';', index=False)
+            del df_prob
+        except FileNotFoundError:
+            df_prob = pd.DataFrame(columns=['oferta_id', 'vae', 'ae', 'ert', 'nn', 'ic', 'rc'])
+            error_test = error_test.rename(columns={'reconstruction_error': 'vae'})
+            df_prob = pd.concat([df_prob, error_test[['oferta_id', 'ae']]], axis=0)
+            df_prob.to_csv(STRING.path_db_extra + 'probability_save_' + str(i) + '.csv', sep=';', index=False)
+
+
     metric_save = pd.DataFrame(metric_save,
-                               columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore',
-                                        'fpr', 'tpr', 'auc'])
+                               columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore'])
     try:
         df = pd.read_csv(STRING.metric_save, sep=';')
     except FileNotFoundError:
         df = pd.DataFrame(
-            columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore', 'fpr', 'tpr', 'auc'])
+            columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore'])
 
     df = pd.concat([df, metric_save], axis=0)
     df = df.drop_duplicates(subset=['model', 'sample'], keep='last')

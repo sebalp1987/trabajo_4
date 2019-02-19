@@ -31,9 +31,35 @@ test_sample_2 = pd.read_csv(STRING.test_sample_2, sep=';')
 test_sample_1 = test_sample_1[['oferta_id', 'target']]
 test_sample_2 = test_sample_2[['oferta_id', 'target']]
 
+test_sample_1 = test[test['oferta_id'].isin(test_sample_1['oferta_id'].values.tolist())]
+test_sample_2 = test[test['oferta_id'].isin(test_sample_2['oferta_id'].values.tolist())]
+
+traininig_sample = test[-test['oferta_id'].isin(test_sample_1['oferta_id'].values.tolist() +
+                                                test_sample_2['oferta_id'].values.tolist())]
+
+# We split to half to have the same proportion of anomalies to train: 50%TOTAL1/AN1, 50%TOTAL2/AN2
+training_sample_1, training_sample_2 = train_test_split(traininig_sample, test_size=0.5, random_state=10)
+training_sample_1 = pd.concat([training_sample_1, test_sample_2], axis=0)
+training_sample_2 = pd.concat([training_sample_2, test_sample_1], axis=0)
+
+# Shuffle
+test = test.sample(frac=1).reset_index(drop=True)
+training_sample_1 = training_sample_1.sample(frac=1).reset_index(drop=True)
+training_sample_2 = training_sample_2.sample(frac=1).reset_index(drop=True)
+
 # X, Y
 x = test.drop([label] + ['oferta_id'], axis=1)
-y = test[[label, 'oferta_id']]
+y = test[[label]]
+
+x_train_sample_1 = training_sample_1.drop([label] + ['oferta_id'], axis=1)
+x_train_sample_2 = training_sample_2.drop([label] + ['oferta_id'], axis=1)
+y_train_sample_1 = training_sample_1[[label]]
+y_train_sample_2 = training_sample_2[[label]]
+
+x_test_sample_1 = test_sample_1.drop([label] + ['oferta_id'], axis=1)
+x_test_sample_2 = test_sample_2.drop([label] + ['oferta_id'], axis=1)
+y_test_sample_1 = test_sample_1[[label, 'oferta_id']]
+y_test_sample_2 = test_sample_2[[label, 'oferta_id']]
 
 # Parameters
 sns.set()
@@ -59,19 +85,27 @@ selection.fit(x)
 features = selection.get_support(indices=True)
 features = x.columns[features]
 x = x[features]
+x_train_sample_1 = x_train_sample_1[features]
+x_train_sample_2 = x_train_sample_2[features]
+x_test_sample_1 = x_test_sample_1[features]
+x_test_sample_2 = x_test_sample_2[features]
 
 for i in x.columns.values.tolist():
     x[i] = x[i].map(float)
     scaler = MinMaxScaler(feature_range=(-1, 1))
     scaler.fit(x[i].values.reshape(-1, 1))
     x[i] = scaler.transform(x[i].values.reshape(-1, 1))
+    x_train_sample_1[i] = scaler.transform(x_train_sample_1[i].values.reshape(-1, 1))
+    x_train_sample_2[i] = scaler.transform(x_train_sample_2[i].values.reshape(-1, 1))
+    x_test_sample_1[i] = scaler.transform(x_test_sample_1[i].values.reshape(-1, 1))
+    x_test_sample_2[i] = scaler.transform(x_test_sample_2[i].values.reshape(-1, 1))
 
 cols = x.shape[1]
 fileNames = np.array(x.columns.values)
 columns = x.columns.values
 # Models
-models = {'ert': ExtraTreesClassifier(n_estimators=10, max_depth=10, bootstrap=True, oob_score=True,
-                                      class_weight='balanced_subsample', max_features='sqrt', random_state=42,
+models = {'ert': ExtraTreesClassifier(n_estimators=1000, max_depth=10, bootstrap=True, oob_score=True,
+                                      class_weight=None, max_features='sqrt', random_state=42,
                                       verbose=True),
           'nn': NeuralNetwork(n_cols=cols, node_size=[node_size, node_size], activation=activation,
                               prob_dropout=prob_dropout),
@@ -89,9 +123,10 @@ predicted_index = np.empty(shape=[0, ])
 skf = StratifiedKFold(n_splits=5, random_state=42, shuffle=False)
 
 # For each Fold
-for train_index, test_index in skf.split(x.values, y[[label]].values):
+'''
+for train_index, test_index in skf.split(x.values, y[label].values):
     x_train, x_test = x.loc[train_index].values, x.loc[test_index].values
-    y_train, y_test = y.drop('oferta_id', axis=1).loc[train_index].values, y.drop('oferta_id', axis=1).loc[test_index].values
+    y_train, y_test = y.loc[train_index].values, y.loc[test_index].values
     print(train_index, test_index)
     if sampling is None:
         pass
@@ -109,7 +144,6 @@ for train_index, test_index in skf.split(x.values, y[[label]].values):
         fileModel.min_samples_split = min_sample_split
         fileModel.fit(x_train, y_train)
         y_pred_score_i = fileModel.predict_proba(x_test)
-        print(y_pred_score_i)
     except:
         fileModel.fit_model(x_train, y_train, learning_rate=learning_rate, loss_function=loss_function,
                             epochs=epochs,
@@ -151,73 +185,23 @@ final_tresh = tresholds[scores[:, 2].argmax()]
 print('Threshold', final_tresh)
 y_hat_test = (y_pred_score > final_tresh).astype(int)
 
-precision = precision_score(y[label].values, y_hat_test)
-recall = recall_score(y[label].values, y_hat_test)
-fbeta = fbeta_score(y[label].values, y_hat_test, beta=1)
+precision = precision_score(y.values, y_hat_test)
+recall = recall_score(y.values, y_hat_test)
+fbeta = fbeta_score(y.values, y_hat_test, beta=1)
 print('PRECISION ', precision)
 print('RECALL ', recall)
 print('FBSCORE ', fbeta)
 
-prob_sample = pd.concat([y, pd.DataFrame(y_pred_score, columns=[model]), pd.DataFrame(y_hat_test, columns=['yhat'])], axis=1)
-
-test_sample_1 = prob_sample[prob_sample['oferta_id'].isin(test_sample_1['oferta_id'].values.tolist())]
-print(test_sample_1)
-test_sample_2 = prob_sample[prob_sample['oferta_id'].isin(test_sample_2['oferta_id'].values.tolist())]
-print(test_sample_2)
 # Confussion Matrix
-i = 0
-metric_save = []
-for test_sample in [test_sample_1, test_sample_2]:
-    i += 1
-    precision = precision_score(test_sample[label].values, test_sample['yhat'].values)
-    recall = recall_score(test_sample[label].values, test_sample['yhat'].values)
-    fbeta = fbeta_score(test_sample[label].values, test_sample['yhat'].values, beta=1)
-    print('PRECISION ', precision)
-    print('RECALL ', recall)
-    print('FBSCORE ', fbeta)
-
-    conf_matrix = confusion_matrix(test_sample[label].values, test_sample['yhat'].values)
-    plot.figure(figsize=(12, 12))
-    sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True,
-                fmt="d", cmap="Blues", cbar=False)
-    plot.title("Confusion matrix")
-    plot.ylabel('True class')
-    plot.xlabel('Predicted class')
-    plot.savefig(STRING.img_path + model + '_confusion_matrix_sample_' + str(i) + '.png')
-    plot.show()
-
-    metric_save_i = [model, i, final_tresh, precision, recall, fbeta]
-    metric_save.append(metric_save_i)
-
-    # PROBABILITY FILE
-    try:
-        df_prob = pd.read_csv(STRING.path_db_extra + 'probability_save_' + str(i) + '.csv', sep=';')
-        del df_prob[model]
-        y_final_test = test_sample.drop('yhat', axis=1)
-        df_prob['oferta_id'] = df_prob['oferta_id'].map(int)
-        y_final_test['oferta_id'] = y_final_test['oferta_id'].map(int)
-        df_prob = pd.merge(df_prob, y_final_test, how='left', on='oferta_id')
-        df_prob.to_csv(STRING.path_db_extra + 'probability_save_' + str(i) + '.csv', sep=';', index=False)
-        del df_prob
-    except FileNotFoundError:
-        df_prob = pd.DataFrame(columns=['oferta_id', 'vae', 'ae', 'ert', 'nn', 'ic', 'rc'])
-        y_final_test = test_sample.drop('yhat', axis=1)
-        df_prob = pd.concat([df_prob, y_final_test], axis=0)
-        df_prob.to_csv(STRING.path_db_extra + 'probability_save_' + str(i) + '.csv', sep=';', index=False)
-
-metric_save = pd.DataFrame(metric_save,
-                           columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore'])
-try:
-    df = pd.read_csv(STRING.metric_save, sep=';')
-except FileNotFoundError:
-    df = pd.DataFrame(
-        columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore'])
-
-df = pd.concat([df, metric_save], axis=0)
-df = df.drop_duplicates(subset=['model', 'sample'], keep='last')
-df.to_csv(STRING.metric_save, sep=';', index=False)
-
-
+conf_matrix = confusion_matrix(y.values, y_hat_test)
+plot.figure(figsize=(12, 12))
+sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True,
+            fmt="d", cmap="Blues", cbar=False)
+plot.title("Confusion matrix")
+plot.ylabel('True class')
+plot.xlabel('Predicted class')
+plot.savefig(STRING.img_path + model + 'confusion_matrix.png')
+plot.show()
 '''
 # FINAL TEST
 i = 0
@@ -331,4 +315,3 @@ except FileNotFoundError:
 df = pd.concat([df, metric_save], axis=0)
 df = df.drop_duplicates(subset=['model', 'sample'], keep='last')
 df.to_csv(STRING.metric_save, sep=';', index=False)
-'''

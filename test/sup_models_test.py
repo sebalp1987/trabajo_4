@@ -57,7 +57,7 @@ cols = x.shape[1]
 fileNames = np.array(x.columns.values)
 
 # Models
-models = {'ert': ExtraTreesClassifier(n_estimators=500, max_depth=20, bootstrap=True, oob_score=True,
+models = {'ert': ExtraTreesClassifier(n_estimators=500, max_depth=20, bootstrap=True, oob_score=False,
                                       class_weight='balanced_subsample', max_features='auto', random_state=42),
           'nn': NeuralNetwork(n_cols=cols, node_size=[100], activation='relu', prob_dropout=0.2),
           'rc': ResidualConnection(n_cols=cols, activation='relu', prob_dropout=0.2,
@@ -76,6 +76,8 @@ skf = StratifiedKFold(n_splits=5, random_state=42, shuffle=False)
 
 # For each Fold
 for train_index, test_index in skf.split(x.values, y[label].values):
+    print(x.values)
+    print(y[[label]].values)
     x_train, x_test = x.loc[train_index].values, x.loc[test_index].values
     y_train, y_test = y.loc[train_index].values, y.loc[test_index].values
     if sampling is None:

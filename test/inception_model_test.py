@@ -14,7 +14,7 @@ from sklearn.preprocessing import StandardScaler
 
 class InceptionModel(object):
     def __init__(self, n_cols, node_size=100, branch_number=4,
-                 prob_dropout=0.1, sparsity_const=10e-5, activation='relu', sampling=None, beta=1):
+                 prob_dropout=0.1, sparsity_const=10e-3, activation='relu', sampling=None, beta=1):
 
         self.n_cols = n_cols
         self.node_size = node_size

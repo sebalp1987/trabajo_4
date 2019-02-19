@@ -17,7 +17,7 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.metrics import (confusion_matrix, precision_recall_curve, recall_score, precision_score, fbeta_score,
-                             roc_auc_score, roc_curve)
+                             roc_auc_score, roc_curve, precision_recall_curve)
 
 sns.set()
 latent_dim = 2
@@ -103,9 +103,9 @@ if __name__ == '__main__':
     cols = train.drop(['oferta_id', 'target'], axis=1).shape[1]
     input = Input(shape=(cols,))
     x = layers.Dense(cols, activation='tanh')(input)
-    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.3, dimension_node=3, encoding_dim=16,
+    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.4, dimension_node=3, encoding_dim=16,
                          final_activation='tanh')
-    vae = VariationalAutoencoder(batch_size=100, latent_dim=latent_dim)
+    vae = VariationalAutoencoder(batch_size=500, latent_dim=latent_dim)
     encoded, intermediate_dim = ae.encoded(input, change_encode_name='Encoder')
     print('First_Layer', encoded)
     
@@ -141,9 +141,9 @@ if __name__ == '__main__':
     early_stopping_monitor = EarlyStopping(patience=2)
     plot_model(vae_model, to_file=STRING.img_path + 'vae_architecture.png', show_shapes=True)
     # tensorboard = TensorBoard(log_dir=STRING.tensorboard_path)
-    history = vae_model.fit(train.drop(['oferta_id', 'target'], axis=1), epochs=1000, batch_size=100, verbose=True,
+    history = vae_model.fit(train.drop(['oferta_id', 'target'], axis=1), epochs=1000, batch_size=None, verbose=True,
                             callbacks=[early_stopping_monitor],
-                            shuffle=True, validation_data=[valid, None]).history
+                            shuffle=True, validation_data=[valid, None], steps_per_epoch=20, validation_steps=10).history
 
     # Plot Loss
     plot.plot(history['loss'])
@@ -215,7 +215,7 @@ if __name__ == '__main__':
     # We define a threshold for the reconstruction error. It will be based on the error plot
 
     # WE SEPARATE THE SAMPLES 50/50
-    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.5, random_state=42)
+    mse_test_valid, mse_test = train_test_split(mse_test, test_size=0.5, random_state=10)
     mse_anormal_valid, mse_anormal = train_test_split(mse_anormal, test_size=0.5, random_state=42)
     error_df_valid = pd.concat([mse_test_valid, mse_anormal_valid], axis=0).reset_index(drop=True)
     error_df_test = pd.concat([mse_test, mse_anormal], axis=0).reset_index(drop=True)
@@ -225,7 +225,7 @@ if __name__ == '__main__':
     error_df_valid['target'] = error_df_valid['target'].map(int)
 
     # ITERATE THROUGH THE SAMPLES
-    thresholds = np.linspace(0.001, 100.0, 10000)
+    thresholds = np.linspace(0.001, 2, 10000)
     i = 0
     metric_save = []
 
@@ -236,19 +236,19 @@ if __name__ == '__main__':
         error_valid = error[1]
 
         for threshold in thresholds:
-            y_hat = [1 if e > threshold else 0 for e in error_valid.reconstruction_error.values]
+            y_hat = [1 if e > threshold else 0 for e in error_test.reconstruction_error.values]
             scores.append([
-                recall_score(y_pred=y_hat, y_true=error_valid.target.values),
-                precision_score(y_pred=y_hat, y_true=error_valid.target.values),
-                fbeta_score(y_pred=y_hat, y_true=error_valid.target.values,
-                            beta=1, average='binary')
+                recall_score(y_pred=y_hat, y_true=error_test.target.values),
+                precision_score(y_pred=y_hat, y_true=error_test.target.values),
+                fbeta_score(y_pred=y_hat, y_true=error_test.target.values,
+                            beta=1)
             ])
-
+        print()
         scores = np.array(scores)
         threshold = thresholds[scores[:, 2].argmax()]
         print('final Threshold ', threshold)
         predicted = [1 if e > threshold else 0 for e in error_test.reconstruction_error.values]
-
+        precision = scores[scores[:, 2].argmax()]
         precision = precision_score(error_test.target.values, predicted)
         recall = recall_score(error_test.target.values, predicted)
         fbeta = fbeta_score(error_test.target.values, predicted, beta=1)
@@ -304,31 +304,35 @@ if __name__ == '__main__':
         error_test['tptn_sum'] = error_test['tptn'].cumsum() / (error_test['index'] + 1)
         error_test.to_csv(STRING.path_db_extra + 'lift_curve_sample_' + str(i) + '.csv', index=False, sep=';')
 
-        # ROC CURVE
-        auc = roc_auc_score(error_test.target.values, error_test.reconstruction_error.values)
-        print('AUC: %.3f' % auc)
-
-        # calculate roc curve
-        fpr, tpr, thresholds = roc_curve(error_test.target.values, error_test.reconstruction_error.values,
-                                         drop_intermediate=False)
-        # plot no skill
-        plot.plot([0, 1], [0, 1], linestyle='--')
-        # plot the roc curve for the model
-        plot.plot(fpr, tpr, marker='.')
-        # show the plot
-        plot.savefig(STRING.img_path + 'roc_curve_sample_' + str(i) + '.png')
-        plot.show()
-
-        metric_save_i = ['vae', i, threshold, precision, recall, fbeta, fpr.tolist(), tpr.tolist(), auc]
+        metric_save_i = ['vae', i, threshold, precision, recall, fbeta]
         metric_save.append(metric_save_i)
+
+        # PROBABILITY FILE
+        try:
+            df_prob = pd.read_csv(STRING.path_db_extra + 'probability_save_' + str(i) + '.csv', sep=';')
+            del df_prob['vae']
+            df_prob['oferta_id'] = df_prob['oferta_id'].map(int)
+            error_test['oferta_id'] = error_test['oferta_id'].map(int)
+            df_prob = pd.merge(df_prob, error_test[['oferta_id', 'reconstruction_error']], how='left', on='oferta_id')
+            df_prob = df_prob.rename(columns={'reconstruction_error': 'vae'})
+            df_prob.to_csv(STRING.path_db_extra + 'probability_save_' + str(i) + '.csv', sep=';', index=False)
+            del df_prob
+        except FileNotFoundError:
+            df_prob = pd.DataFrame(columns=['oferta_id', 'vae', 'ae', 'ert', 'nn', 'ic', 'rc'])
+            error_test = error_test.rename(columns={'reconstruction_error': 'vae'})
+            df_prob = pd.concat([df_prob, error_test[['oferta_id', 'vae']]], axis=0)
+            df_prob.to_csv(STRING.path_db_extra + 'probability_save_' + str(i) + '.csv', sep=';', index=False)
+
+    # METRIC SAVE
     metric_save = pd.DataFrame(metric_save,
-                               columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore',
-                                        'fpr', 'tpr', 'auc'])
+                               columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore'])
+
     try:
         df = pd.read_csv(STRING.metric_save, sep=';')
     except FileNotFoundError:
         df = pd.DataFrame(
-            columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore', 'fpr', 'tpr', 'auc'])
+            columns=['model', 'sample', 'threshold', 'precision', 'recall', 'fbscore'])
+
 
     df = pd.concat([df, metric_save], axis=0)
     df = df.drop_duplicates(subset=['model', 'sample'], keep='last')

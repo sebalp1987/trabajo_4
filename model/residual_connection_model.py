@@ -8,7 +8,7 @@ import STRING
 
 class ResidualConnection(object):
     def __init__(self, n_cols, number_layers=6, node_size=100,
-                 prob_dropout=0.1, sparsity_const=10e-4, activation='relu', different_size=None,
+                 prob_dropout=0.1, sparsity_const=10e-2, activation='relu', different_size=None,
                  beta=1, nodes_range='auto'):
         """
         :param n_cols: Number of columns of the dataset
@@ -82,7 +82,7 @@ class ResidualConnection(object):
 
     def fit_model(self, predictors, target, learning_rate=0.001, loss_function='categorical_crossentropy', epochs=500,
                   batch_size=500, verbose=True, validation_data=None, validation_split=None,
-                  class_weight=None):
+                  class_weight=None, steps_per_epoch=None, validation_steps=None):
         target = to_categorical(target)
         if validation_data is not None:
             validation_data[1] = to_categorical(validation_data[1].target)
@@ -92,7 +92,8 @@ class ResidualConnection(object):
         self.model.compile(optimizer=optimizer, loss=loss_function, metrics=['accuracy'])
         self.model.fit(x=predictors, y=target, epochs=epochs, batch_size=batch_size, validation_data=validation_data,
                        callbacks=[callback_list], verbose=verbose, class_weight=class_weight,
-                       validation_split=validation_split)
+                       validation_split=validation_split, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps,
+                       shuffle=False)
 
     def predict_model(self, x_test):
         return self.model.predict(x_test)
