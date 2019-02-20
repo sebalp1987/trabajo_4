@@ -9,7 +9,7 @@ import STRING
 class NeuralNetwork(object):
 
     def __init__(self, n_cols, node_size=[100],
-                 prob_dropout=None, sparsity_const=10e-4, activation='relu'):
+                 prob_dropout=None, sparsity_const=10e-5, activation='relu'):
         """
         :param n_cols: Number of Predictors
         :param node_size: Node Size (but also the len(node_size) determines the number of layers)

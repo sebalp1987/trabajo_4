@@ -8,7 +8,7 @@ import STRING
 
 class ResidualConnection(object):
     def __init__(self, n_cols, number_layers=6, node_size=100,
-                 prob_dropout=0.1, sparsity_const=10e-2, activation='relu', different_size=None,
+                 prob_dropout=0.1, sparsity_const=10e-5, activation='relu', different_size=None,
                  beta=1, nodes_range='auto'):
         """
         :param n_cols: Number of columns of the dataset

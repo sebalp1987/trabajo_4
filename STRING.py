@@ -42,6 +42,7 @@ test_sample_1_normalize = path_training + 'test_sample1_normal.csv'
 test_sample_2_normalize = path_training + 'test_sample2_normal.csv'
 
 metric_save = path_db_extra + 'metric_save.csv'
+param_save = path_db_extra + 'param_save.csv'
 
 img_path = os.path.dirname(os.path.dirname(LOCAL)) + '/3-latex/images/'
 tensorboard_path = os.path.dirname(LOCAL) + '/tensorboard/'
@@ -57,4 +58,13 @@ configure_names = {'cliente_numero_siniestros_auto': 'Sum of vehicle claims per 
                    'antiguedad_permiso_riesgo': 'License Years < 1',
                    'edad_segundo_conductor_riesgo': 'Second Driver Age < 22',
                    'cliente_extranjero': 'Spanish / Foreigner', 'edad_conductor_riesgo': 'Customer Age < 22',
-                   'cliente_sexo': 'Gender', 'antiguedad_permiso_segundo_riesgo': 'Second Driver License Years < 1'}
+                   'cliente_sexo': 'Gender', 'antiguedad_permiso_segundo_riesgo': 'Second Driver License Years < 1',
+                   'oferta_sim_anios_asegurado': 'Years Insured',
+                   'oferta_sim_antiguedad_cia_actual': 'Years Insured Last Company',
+                   'clusters_zip code_risk': 'ZIP Risk Cluster', 'oferta_propietario_cond': 'Owner is Driver',
+                   'oferta_propietario_tom': 'Owner is Insured', 'cliente_edad_65': 'Age > 65 years',
+                   'clusters_customer_risk':
+                       'Customer Risk Cluster', 'd_tipo_car': 'Car', 'antiguedad_permiso': 'License Years',
+                   'd_tipo_van-track': 'Van-Track',
+                   'oferta_tomador_sexo': 'Gender', 'clusters_intermediary_risk': 'Intermediary Risk Cluster',
+                   'cliente_edad_30_65': '30 < Age < 65'}
