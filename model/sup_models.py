@@ -2,6 +2,7 @@ import pandas as pd
 import STRING
 import numpy as np
 import matplotlib.pyplot as plot
+import matplotlib
 import seaborn as sns
 
 from resources.sampling import over_sampling, under_sampling
@@ -130,7 +131,9 @@ for train_index, test_index in skf.split(x.values, y[[label]].values):
         fileNames_k = fileNames[sorted_idx_k]
         fileNames_k = fileNames_k[-10:]
         fileNames_k = pd.DataFrame(fileNames_k, columns=['names'])
-        fileNames_k = fileNames_k.reset_index(drop=False).sort_values(by='index', ascending=False).drop('index', axis=1).reset_index(drop=True).reset_index(drop=False)
+        fileNames_k = fileNames_k.reset_index(drop=False).sort_values(by='index', ascending=False).drop('index',
+                                                                                                        axis=1).reset_index(
+            drop=True).reset_index(drop=False)
         feature_name_k = pd.concat([feature_name_k, fileNames_k], axis=0)
         print(feature_name_k)
         print(featureImportance)
@@ -151,7 +154,7 @@ for train_index, test_index in skf.split(x.values, y[[label]].values):
             print(fileNames_1)
             plot.yticks(barPos, fileNames_1, fontsize=8)
             plot.xlabel('Variable Importance')
-            plot.savefig(STRING.img_path + 'feature_importance_k_folds.png')
+            # plot.savefig(STRING.img_path + 'feature_importance_k_folds.png')
             plot.show()
             plot.close()
 
@@ -167,10 +170,16 @@ for train_index, test_index in skf.split(x.values, y[[label]].values):
             for k, v in STRING.configure_names.items():
                 feature_name_k.loc[feature_name_k['names'] == k, 'names'] = v
 
-            plot.bar(feature_name_k['names'], feature_name_k['count'])
-            plot.plot(feature_name_k['names'], feature_name_k['position'])
-            plot.xticks(rotation=30, fontsize=8)
-            plot.savefig(STRING.img_path + 'feature_importance_ranking.png')
+            fig, ax1 = plot.subplots()
+            ax1.bar(feature_name_k['names'], feature_name_k['count'])
+            plot.xticks(rotation=20, fontsize=8)
+            ax2 = ax1.twinx()
+            ax2.plot(feature_name_k['names'], feature_name_k['position'], 'g-')
+            ax1.set_ylabel('Count k-Folds', color='b')
+            ax2.set_ylabel('Average Position', color='g')
+            ax2.grid(False)
+            fig.tight_layout()
+            # plot.savefig(STRING.img_path + 'feature_importance_ranking.png')
             plot.show()
 
 
@@ -185,8 +194,6 @@ for train_index, test_index in skf.split(x.values, y[[label]].values):
     y_pred_score = np.append(y_pred_score, y_pred_score_i, axis=0)
     predicted_index = np.append(predicted_index, test_index, axis=0)
     del x_train, x_test, y_train, y_test
-
-
 
 # We keep only one class probability
 y_pred_score = y_pred_score[:, 1]
@@ -282,5 +289,3 @@ except FileNotFoundError:
 df = pd.concat([df, metric_save], axis=0)
 df = df.drop_duplicates(subset=['model', 'sample'], keep='last')
 df.to_csv(STRING.metric_save, sep=';', index=False)
-
-

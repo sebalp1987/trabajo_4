@@ -62,8 +62,8 @@ for sampling in [None, 'ADASYN', 'SMOTE', 'ALLKNN']:
         for node_size in [48, 50, 100, 200]:
             for steps_per_epoch in [10, 15, 20, 25]:
                 for validation_steps in [10, 15, 20, 25]:
-                    for loss_function in ['binary_crossentropy', 'mean_squared_error', 'mean_absolute_error']:
-                        for sparsity_const in [10e-1, 10e-2, 10e-3, 10e-4, 10e-5]:
+                    for loss_function in ['binary_crossentropy']:
+                        for sparsity_const in [10e-2, 10e-3, 10e-4, 10e-5]:
                             for activation in ['tanh', 'relu']:
                                 for feature_range in [(-1, 1), (0, 1)]:
                                     for model in ['ic', 'rc', 'nn']:
