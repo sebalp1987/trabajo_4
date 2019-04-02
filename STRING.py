@@ -42,7 +42,7 @@ test_sample_1_normalize = path_training + 'test_sample1_normal.csv'
 test_sample_2_normalize = path_training + 'test_sample2_normal.csv'
 
 metric_save = path_db_extra + 'metric_save.csv'
-param_save = path_db_extra + 'param_save2.csv'
+param_save = path_db_extra + 'param_save3.csv'
 
 img_path = os.path.dirname(os.path.dirname(LOCAL)) + '/3-latex/images/'
 tensorboard_path = os.path.dirname(LOCAL) + '/tensorboard/'

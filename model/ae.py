@@ -36,7 +36,7 @@ class DeepAutoencoder(object):
         self.encoding_dim = encoding_dim
         self.final_activation = final_activation
 
-    def encoded(self, input_layer, sparsity_const=10e-3, change_encode_name=None):
+    def encoded(self, input_layer, sparsity_const=0.0001, change_encode_name=None):
         """
         Generate the encode layers
         :param input_layer: The input layer
@@ -167,7 +167,7 @@ if __name__ == '__main__':
     # INPUT COLS
     cols = train.drop(['oferta_id', 'target'], axis=1).shape[1]
 
-    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.4, dimension_node=3, encoding_dim=16,
+    ae = DeepAutoencoder(n_cols=cols, activation='tanh', prob_dropout=0.3, dimension_node=3, encoding_dim=16,
                          final_activation='sigmoid')
     early_stopping_monitor = EarlyStopping(patience=2)
     # tensorboard = TensorBoard(log_dir=STRING.tensorboard_path, histogram_freq=1)

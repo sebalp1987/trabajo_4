@@ -143,7 +143,7 @@ if __name__ == '__main__':
     # tensorboard = TensorBoard(log_dir=STRING.tensorboard_path)
     history = vae_model.fit(train.drop(['oferta_id', 'target'], axis=1), epochs=1000, batch_size=None, verbose=True,
                             callbacks=[early_stopping_monitor],
-                            shuffle=True, validation_data=[valid, None], steps_per_epoch=20, validation_steps=10).history
+                            shuffle=True, validation_data=[valid, None], steps_per_epoch=15, validation_steps=10).history
 
     # Plot Loss
     plot.plot(history['loss'])
@@ -275,7 +275,7 @@ if __name__ == '__main__':
         conf_matrix = confusion_matrix(error_test.target, predicted)
         plot.figure(figsize=(12, 12))
         sns.heatmap(conf_matrix, xticklabels=['Normal', 'Anomaly'], yticklabels=['Normal', 'Anomaly'], annot=True,
-                    fmt="d", cmap="Blues", cbar=False)
+                    fmt="d", cmap="Blues", cbar=False, annot_kws={"size": 20})
         plot.title("Confusion matrix")
         plot.ylabel('True class')
         plot.xlabel('Predicted class')

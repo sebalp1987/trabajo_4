@@ -26,9 +26,11 @@ dict_thresh_1 = {}
 dict_thresh_2 = {}
 
 for col in df_prob_1.drop(['oferta_id', 'target'], axis=1).columns.values.tolist():
+    print(col)
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaler.fit(df_prob_1[col].values.reshape(-1, 1))
     df_prob_1[col] = scaler.transform(df_prob_1[col].values.reshape(-1, 1))
+    print(metric_save_1.loc[metric_save_1['model'] == col, 'threshold'])
     thresh = metric_save_1.loc[metric_save_1['model'] == col, 'threshold'].values[0]
     thresh = scaler.transform(thresh.reshape(-1, 1))
     dict_thresh_1[col] = thresh

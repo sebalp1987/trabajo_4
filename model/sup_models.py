@@ -50,12 +50,12 @@ batch_size = None
 sampling = None
 prob_dropout = 0.3
 activation = 'tanh'
-model = 'ert'
-node_size = 100
+model = 'rc'
+node_size = 50
 steps_per_epoch = 15
 validation_steps = 10
 loss_function = 'binary_crossentropy'
-sparsity_const = 10e-5
+sparsity_const = 0.0001
 feature_range = (-1, 1)
 
 # Variance Reduction
