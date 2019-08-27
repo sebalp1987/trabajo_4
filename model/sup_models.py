@@ -23,7 +23,22 @@ label = 'target'
 train = pd.read_csv(STRING.train, sep=';', encoding='latin1')
 valid = pd.read_csv(STRING.valid, sep=';', encoding='latin1')
 test = pd.read_csv(STRING.test, sep=';', encoding='latin1')
+train = train.drop(['oferta_sim_siniestro_5_anio_culpa', 'oferta_sim_anios_asegurado',
+                      'oferta_sim_antiguedad_cia_actual', 'oferta_sim_siniestro_1_anio_culpa',
+                      'oferta_bonus_simulacion_perc'
+                      ], axis=1)
+
+valid = valid.drop(['oferta_sim_siniestro_5_anio_culpa', 'oferta_sim_anios_asegurado',
+                        'oferta_sim_antiguedad_cia_actual', 'oferta_sim_siniestro_1_anio_culpa',
+                        'oferta_bonus_simulacion_perc'], axis=1)
+
+test = test.drop(['oferta_sim_siniestro_5_anio_culpa', 'oferta_sim_anios_asegurado',
+                        'oferta_sim_antiguedad_cia_actual', 'oferta_sim_siniestro_1_anio_culpa',
+                        'oferta_bonus_simulacion_perc'], axis=1)
+
+
 test = pd.concat([train, valid, test], axis=0).reset_index(drop=True)
+
 test = test.drop_duplicates(subset=['oferta_id'])
 
 # Final test file, we remove the cases from x
@@ -50,7 +65,7 @@ batch_size = None
 sampling = None
 prob_dropout = 0.3
 activation = 'tanh'
-model = 'rc'
+model = 'ert'
 node_size = 50
 steps_per_epoch = 15
 validation_steps = 10

@@ -65,6 +65,7 @@ if __name__ == '__main__':
     normal = pd.read_csv(STRING.normal_file, sep=';', encoding='latin1')
     anormal = pd.read_csv(STRING.anormal_file, sep=';', encoding='latin1')
 
+
     # NORMALIZE
     normal['CONTROL'] = pd.Series(0, index=normal.index)
     anormal['CONTROL'] = pd.Series(1, index=anormal.index)

@@ -56,6 +56,10 @@ if __name__ == '__main__':
 
     df = pd.concat([normal, anormal], axis=0)
 
+    df = df.drop(['oferta_sim_siniestro_5_anio_culpa', 'oferta_sim_anios_asegurado',
+                        'oferta_sim_antiguedad_cia_actual', 'oferta_sim_siniestro_1_anio_culpa',
+                        'oferta_bonus_simulacion_perc'], axis=1)
+
     # Final test file, we remove the cases from x
     test_sample_1 = pd.read_csv(STRING.test_sample_1, sep=';')
     test_sample_2 = pd.read_csv(STRING.test_sample_2, sep=';')
@@ -72,6 +76,7 @@ if __name__ == '__main__':
         df = df[-df['oferta_id'].isin(test_sample_2['oferta_id'].values.tolist())]
     df = df.reset_index(drop=True)
     df['target'] = df['target'].map(float)
+
     y = df[['oferta_id', 'target']]
     df = df.drop(['oferta_id', 'target'], axis=1)
     y_test_sample_1 = test_sample_1[['oferta_id', 'target']]
@@ -88,8 +93,8 @@ if __name__ == '__main__':
         x_test_sample_2[i] = scaler.transform(x_test_sample_2[i].values.reshape(-1, 1))
 
     # WE GET THE BEST LABELS OF ISOLATION FOREST
-    labels, _, _, _ = isolation_forest(df, y.drop('oferta_id', axis=1), contamination=0.06, validation=[x_test_sample_1,
-                                                                                                        y_test_sample_1.drop(
+    labels, _, _, _ = isolation_forest(df, y.drop('oferta_id', axis=1), contamination=0.06, validation=[x_test_sample_2,
+                                                                                                        y_test_sample_2.drop(
                                                                                                             'oferta_id',
                                                                                                             axis=1)],
                                        n_estimators=500,
